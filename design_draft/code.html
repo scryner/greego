@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Greego - Spatial Interface</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Noto+Sans:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#2b2bee",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101022",
+                        "surface-dark": "#1e1e2d",
+                        "border-dark": "#232348",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"],
+                        "body": ["Noto Sans", "sans-serif"],
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "2xl": "1rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>.scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-thin::-webkit-scrollbar {
+            width: 6px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+            background-color: #33334d;
+            border-radius: 20px;
+        }.bg-grid-pattern {
+            background-image: radial-gradient(#353546 1.5px, transparent 1.5px);
+            background-size: 24px 24px;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white font-display overflow-hidden h-screen w-screen selection:bg-primary/30 relative">
+<div class="absolute inset-0 z-0 pointer-events-none bg-grid-pattern opacity-20"></div>
+<header class="absolute top-0 left-0 w-full z-50 flex items-center justify-between px-6 py-4 pointer-events-none">
+<div class="flex items-center gap-3 pointer-events-auto bg-surface-dark/80 backdrop-blur-md p-2 pr-4 rounded-xl border border-border-dark shadow-lg">
+<div class="size-8 bg-primary rounded-lg flex items-center justify-center text-white shadow-inner shadow-white/20">
+<span class="material-symbols-outlined text-[20px]">all_inclusive</span>
+</div>
+<h1 class="text-white text-lg font-bold tracking-tight">Greego</h1>
+</div>
+<div class="flex items-center gap-4 pointer-events-auto">
+<div class="flex items-center gap-3 bg-surface-dark/80 backdrop-blur-md py-1.5 px-2 pl-4 rounded-full border border-border-dark hover:border-primary/50 transition-colors cursor-pointer group">
+<div class="flex flex-col items-end mr-1">
+<span class="text-xs font-bold text-white leading-none">Alex Designer</span>
+<span class="text-[10px] text-gray-400 leading-none mt-1">Pro Plan</span>
+</div>
+<div class="size-9 rounded-full bg-cover bg-center border-2 border-primary/20 group-hover:border-primary transition-colors" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDLX9I4XQQ4duHJ8GDF5AzI_ocvKGPEgQLAN6ciGvTDqlhFDGr3DUzINaDUllaSrYYp8rSzs3V7hCO0pr7d9-_dSPfCjDpkPTkNeL3n7pPxRfoSZIWhjeBNi_dsQK__QJ_gjXcSQ3CuRKTyFh_0dO76DeLHvJruEWWcp0HLzMjVUECnKIdTSXL-RITd0iheT00iCWhhqXil_qudy8GKIDDpLeHL3xYAuU9sOdbSKbsM6tZoP4Py0UdoRwGWzy_-vDR5mjrhWUeXSPM");'></div>
+</div>
+</div>
+</header>
+<button class="absolute top-24 left-8 z-40 bg-primary hover:bg-blue-600 text-white px-6 py-3 rounded-xl shadow-[0_8px_20px_rgba(43,43,238,0.4)] flex items-center gap-3 font-semibold transition-transform hover:-translate-y-1 group border border-white/10">
+<span class="material-symbols-outlined bg-white/20 rounded-full p-1 text-[20px]">add</span>
+<span>Create New Node</span>
+</button>
+<div class="relative w-full h-full z-10 overflow-auto flex items-center justify-start pl-20 pt-20 custom-scrollbar">
+<div class="relative min-w-[2000px] min-h-[1200px] transform scale-90 origin-top-left">
+<svg class="absolute inset-0 z-0 w-full h-full pointer-events-none overflow-visible">
+<defs>
+<linearGradient id="gradient-active" x1="0%" x2="100%" y1="0%" y2="0%">
+<stop offset="0%" style="stop-color:#2b2bee;stop-opacity:1"></stop>
+<stop offset="100%" style="stop-color:#6366f1;stop-opacity:1"></stop>
+</linearGradient>
+<marker id="arrowhead" markerHeight="7" markerWidth="10" orient="auto" refX="9" refY="3.5">
+<polygon fill="#2b2bee" points="0 0, 10 3.5, 0 7"></polygon>
+</marker>
+</defs>
+<path d="M 520 380 C 650 380, 650 600, 780 600" fill="none" marker-end="url(#arrowhead)" stroke="url(#gradient-active)" stroke-width="3"></path>
+</svg>
+<div class="absolute top-[250px] left-[120px] w-[400px] flex flex-col bg-surface-dark border border-border-dark rounded-xl shadow-2xl overflow-hidden group hover:border-primary/50 transition-all">
+<div class="bg-[#25253a] p-4 border-b border-border-dark flex flex-col gap-2">
+<div class="flex justify-between items-start">
+<span class="text-[10px] font-bold text-primary uppercase tracking-wider bg-primary/10 px-2 py-0.5 rounded">Strategy</span>
+<span class="material-symbols-outlined text-gray-500 text-[18px] cursor-move">drag_indicator</span>
+</div>
+<p class="text-white font-medium text-lg leading-snug font-display">Initialize project roadmap for "Alpha". Focus on Q3 launch.</p>
+</div>
+<div class="p-5 bg-background-dark/50 text-gray-300 text-sm font-body leading-relaxed">
+<p class="mb-3">I've initialized Project Alpha. Based on Q3 targets, here are the main tracks:</p>
+<ul class="list-disc pl-5 space-y-1 text-gray-400">
+<li>Marketing &amp; GTM Strategy</li>
+<li>Technical Infrastructure Setup</li>
+<li>Legal &amp; Compliance Review</li>
+</ul>
+</div>
+<div class="bg-surface-dark p-3 border-t border-border-dark flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="size-6 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-[12px]">smart_toy</span>
+</div>
+<span class="text-[10px] text-gray-500 font-bold">GPT-4 Turbo</span>
+</div>
+<div class="flex gap-2">
+<button class="text-xs bg-white/5 hover:bg-white/10 text-gray-300 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors border border-white/5">
+<span class="material-symbols-outlined text-[14px]">fork_right</span> Branch
+                        </button>
+</div>
+</div>
+</div>
+<div class="absolute top-[500px] left-[780px] w-[420px] flex flex-col bg-surface-dark border-2 border-primary rounded-xl shadow-[0_0_40px_rgba(43,43,238,0.2)] overflow-hidden z-20">
+<div class="bg-gradient-to-r from-[#25253a] to-[#1e1e2d] p-4 border-b border-border-dark flex flex-col gap-2 cursor-move">
+<div class="flex justify-between items-start">
+<span class="text-[10px] font-bold text-primary uppercase tracking-wider bg-primary/10 px-2 py-0.5 rounded flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">hub</span> Tech Specs
+                        </span>
+<div class="flex gap-2">
+<button class="text-gray-500 hover:text-white transition-colors"><span class="material-symbols-outlined text-[18px]">edit</span></button>
+<button class="text-gray-500 hover:text-white transition-colors"><span class="material-symbols-outlined text-[18px]">close</span></button>
+</div>
+</div>
+<p class="text-white font-medium text-lg leading-snug font-display">Generate a schema for the user database. We need to support RBAC.</p>
+</div>
+<div class="p-5 bg-background-dark text-gray-300 text-sm font-body leading-relaxed">
+<p class="mb-3">Here is a proposed PostgreSQL schema including Role-Based Access Control (RBAC):</p>
+<div class="bg-[#11111a] rounded-lg p-3 font-mono text-xs text-blue-300 overflow-x-auto border border-white/5 shadow-inner">
+<span class="text-purple-400">CREATE TABLE</span> users (<br/>
+                          id UUID <span class="text-purple-400">PRIMARY KEY</span>,<br/>
+                          email <span class="text-yellow-400">VARCHAR</span>(255) <span class="text-purple-400">UNIQUE</span>,<br/>
+                          role_id <span class="text-yellow-400">INT</span> <span class="text-purple-400">REFERENCES</span> roles(id)<br/>
+                        );
+                    </div>
+</div>
+<div class="bg-surface-dark p-3 border-t border-border-dark flex items-center justify-between gap-3">
+<div class="flex items-center gap-2">
+<div class="size-6 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-[12px]">code</span>
+</div>
+<span class="text-[10px] text-gray-500 font-bold">Codex</span>
+</div>
+<div class="flex gap-2">
+<button class="bg-surface-dark hover:bg-[#353546] text-gray-300 text-xs px-3 py-1.5 rounded-lg font-medium flex items-center gap-1 border border-border-dark transition-colors">
+<span class="material-symbols-outlined text-[14px]">content_copy</span> Copy
+                        </button>
+<button class="bg-primary hover:bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg font-medium flex items-center gap-1 shadow-lg shadow-blue-900/20">
+<span class="material-symbols-outlined text-[16px]">add_circle</span> Follow-up
+                        </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="absolute bottom-8 left-1/2 -translate-x-1/2 z-50">
+<div class="flex items-center gap-1 p-2 bg-[#1e1e2d]/90 backdrop-blur-xl border border-border-dark rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.3)]">
+<button class="group relative flex flex-col items-center justify-center w-10 h-10 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-all">
+<span class="material-symbols-outlined text-[20px]">pan_tool</span>
+<span class="absolute -top-10 bg-black text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Pan</span>
+</button>
+<button class="group relative flex flex-col items-center justify-center w-10 h-10 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-all">
+<span class="material-symbols-outlined text-[20px]">zoom_in</span>
+</button>
+<button class="group relative flex flex-col items-center justify-center w-10 h-10 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-all">
+<span class="material-symbols-outlined text-[20px]">zoom_out</span>
+</button>
+<div class="w-px h-5 bg-gray-700 mx-1"></div>
+<button class="group relative flex flex-col items-center justify-center w-10 h-10 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-all">
+<span class="material-symbols-outlined text-[20px]">fit_screen</span>
+</button>
+</div>
+</div>
+<div class="absolute right-6 top-24 bottom-6 w-16 hover:w-72 transition-all duration-300 z-40 flex flex-col items-end group">
+<div class="h-full bg-[#1e1e2d]/95 backdrop-blur-md border border-border-dark rounded-2xl shadow-2xl overflow-hidden flex flex-col w-full">
+<div class="h-16 flex items-center px-4 border-b border-border-dark shrink-0">
+<span class="material-symbols-outlined text-primary text-[24px] min-w-[24px]">folder_open</span>
+<span class="ml-4 font-bold text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 delay-100">Project Files</span>
+</div>
+<div class="flex-1 overflow-y-auto p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 delay-100">
+<div class="space-y-2">
+<div class="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 cursor-pointer">
+<div class="size-8 rounded bg-red-500/20 flex items-center justify-center text-red-400 shrink-0">
+<span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+</div>
+<div class="overflow-hidden">
+<p class="text-sm text-gray-200 truncate">Q3_Roadmap.pdf</p>
+<p class="text-[10px] text-gray-500">2.4 MB • Added 2h ago</p>
+</div>
+</div>
+<div class="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 cursor-pointer">
+<div class="size-8 rounded bg-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
+<span class="material-symbols-outlined text-[18px]">description</span>
+</div>
+<div class="overflow-hidden">
+<p class="text-sm text-gray-200 truncate">Marketing_Brief_v2.docx</p>
+<p class="text-[10px] text-gray-500">540 KB • Added yesterday</p>
+</div>
+</div>
+<div class="mt-4 pt-4 border-t border-white/5">
+<p class="text-xs font-bold text-gray-500 px-2 mb-2 uppercase tracking-wider">Services</p>
+<div class="flex items-center gap-3 p-2 rounded-lg bg-white/5 border border-white/5">
+<span class="material-symbols-outlined text-green-400 text-[20px]">check_circle</span>
+<div class="overflow-hidden">
+<p class="text-sm text-white">RAG Indexing</p>
+<p class="text-[10px] text-gray-400">Active • 405 Vectors</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="absolute top-20 right-0 w-16 h-full flex flex-col items-center gap-4 pt-4 group-hover:opacity-0 transition-opacity duration-200">
+<div class="size-2 rounded-full bg-red-400"></div>
+<div class="size-2 rounded-full bg-blue-400"></div>
+</div>
+</div>
+</div>
+<div class="absolute bottom-8 right-8 w-40 h-28 bg-[#1e1e2d] border border-border-dark rounded-xl shadow-lg z-40 overflow-hidden opacity-80 hover:opacity-100 transition-opacity">
+<div class="w-full h-full relative bg-[#111] p-2">
+<div class="absolute top-[20%] left-[10%] w-[15%] h-[20%] bg-gray-600 rounded"></div>
+<div class="absolute top-[10%] left-[40%] w-[15%] h-[15%] bg-gray-700 rounded opacity-50"></div>
+<div class="absolute top-[40%] left-[40%] w-[15%] h-[25%] bg-primary rounded border border-white/50"></div>
+<div class="absolute top-[35%] left-[35%] w-[40%] h-[40%] border-2 border-white/30 rounded shadow-[0_0_0_100px_rgba(0,0,0,0.5)] pointer-events-none"></div>
+</div>
+</div>
+</body></html>
