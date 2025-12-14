@@ -1,12 +1,11 @@
+import { Sidebar } from './components/Sidebar';
+import { CanvasBoard } from './components/CanvasBoard';
+
 function App() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-100 p-4 text-center">
-      <h1 className="mb-4 text-4xl font-bold text-blue-600">
-        Hello Tauri + React + Vite + Tailwind!
-      </h1>
-      <p className="text-lg text-gray-700">
-        Edit <code className="rounded bg-gray-200 px-1 py-0.5">src/App.tsx</code> to start building your app.
-      </p>
+    <div className="flex h-screen w-full overflow-hidden bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 transition-colors duration-200">
+      <Sidebar />
+      <CanvasBoard />
     </div>
   );
 }
