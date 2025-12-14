@@ -83,7 +83,8 @@ export const CanvasBoard = () => {
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 nodeTypes={nodeTypes}
-                fitView
+
+                defaultViewport={{ x: 0, y: 0, zoom: 0.85 }}
                 className="bg-background-light dark:bg-background-dark"
             >
                 <Background
