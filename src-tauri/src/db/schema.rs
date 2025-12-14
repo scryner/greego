@@ -21,6 +21,8 @@ pub struct ChatNode {
 pub struct FlowEdge {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<Thing>,
-    pub source: String,
-    pub target: String,
+    #[serde(alias = "in")]
+    pub source: Thing,
+    #[serde(alias = "out")]
+    pub target: Thing,
 }
