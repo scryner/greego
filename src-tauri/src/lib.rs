@@ -27,8 +27,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::save_node_command,
-            commands::connect_edge_command,
-            commands::load_board_command
+            // commands::connect_edge_command,
+            commands::load_canvas_command
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

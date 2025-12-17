@@ -1,6 +1,7 @@
-use crate::db::schema::{ChatNode, FlowEdge};
+use crate::db::schema::{Derives, Node, Sequences};
 use std::sync::Arc;
 use surrealdb::engine::local::{Db, RocksDb};
+use surrealdb::sql::Thing;
 use surrealdb::Surreal;
 use tokio::sync::OnceCell;
 
@@ -32,7 +33,7 @@ impl Database {
         DB.get().cloned()
     }
 
-    pub async fn upsert_node(&self, node: ChatNode) -> Result<ChatNode, surrealdb::Error> {
+    pub async fn upsert_node(&self, node: Node) -> Result<Node, surrealdb::Error> {
         // We clone needed parts to satisfy 'static requirement or move them
         let mut result = if let Some(id) = &node.id {
             self.client
@@ -48,38 +49,29 @@ impl Database {
         };
 
         // The result is usually a list of results, we take the first one
-        let created: Option<ChatNode> = result.take(0)?;
+        let created: Option<Node> = result.take(0)?;
         Ok(created.expect("Database returned no result for node upsert"))
     }
 
-    pub async fn connect_nodes(
+    pub async fn load_canvas(
         &self,
-        _edge_id: Option<String>,
-        source: String,
-        target: String,
-    ) -> Result<FlowEdge, surrealdb::Error> {
-        // RELATE source->connected_to->target
-        // We are ignoring edge_id for now as RELATE handles ID generation,
-        // unless we want to force specific logic which is complex with RELATE in this context without specific ID format.
-
-        let mut response = self
+        canvas_id: Thing,
+    ) -> Result<(Vec<Node>, Vec<Derives>, Vec<Sequences>), surrealdb::Error> {
+        let sql = r#"
+            SELECT * FROM node WHERE id IN (SELECT VALUE out FROM holds WHERE in = $canvas_id);
+            SELECT * FROM derives WHERE canvas = $canvas_id;
+            SELECT * FROM sequences WHERE canvas = $canvas_id;
+        "#;
+        let mut responses = self
             .client
-            .query("RELATE type::thing($source)->connected_to->type::thing($target) RETURN AFTER")
-            .bind(("source", source))
-            .bind(("target", target))
+            .query(sql)
+            .bind(("canvas_id", canvas_id))
             .await?;
 
-        let created_edge: Option<FlowEdge> = response.take(0)?;
-        Ok(created_edge.expect("Database returned no result for edge creation"))
-    }
+        let nodes: Vec<Node> = responses.take(0)?;
+        let derives: Vec<Derives> = responses.take(1)?;
+        let sequences: Vec<Sequences> = responses.take(2)?;
 
-    pub async fn load_graph(&self) -> Result<(Vec<ChatNode>, Vec<FlowEdge>), surrealdb::Error> {
-        let mut nodes_res = self.client.query("SELECT * FROM node").await?;
-        let nodes: Vec<ChatNode> = nodes_res.take(0)?;
-
-        let mut edges_res = self.client.query("SELECT * FROM connected_to").await?;
-        let edges: Vec<FlowEdge> = edges_res.take(0)?;
-
-        Ok((nodes, edges))
+        Ok((nodes, derives, sequences))
     }
 }
