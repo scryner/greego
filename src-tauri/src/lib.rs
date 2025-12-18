@@ -17,8 +17,10 @@ pub fn run() {
             }
 
             // Initialize DB
-            let db_arc = tauri::async_runtime::block_on(async { Database::init().await })
-                .expect("Failed to initialize database");
+            let app_handle = app.handle().clone();
+            let db_arc =
+                tauri::async_runtime::block_on(async move { Database::init(app_handle).await })
+                    .expect("Failed to initialize database");
 
             // Manage the Database (cloning the struct which holds the Arc)
             app.manage((*db_arc).clone());
