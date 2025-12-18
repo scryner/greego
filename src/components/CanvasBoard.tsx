@@ -94,20 +94,8 @@ export const CanvasBoard = () => {
             const newNodes = await GraphAPI.invokeChat(canvasId, text);
 
             // Transform backend nodes to ReactFlow nodes
-            const rfNodes = newNodes.map(n => {
-                const nodeId = getSafeId(n.id);
+            const rfNodes = newNodes.map(transformBackendNode);
 
-                return {
-                    id: nodeId,
-                    position: n.position,
-                    data: {
-                        content: (n.type as any)?.data?.value?.text || JSON.stringify(n.data),
-                        title: (n.type as any)?.data?.value?.role === 'user' ? 'Me' : 'AI',
-                        onDelete: handleDeleteNode // Pass delete handler
-                    },
-                    type: 'chatNode'
-                };
-            });
 
             // If we found the temp node, adjust positions of new nodes to match
             if (rfNodes.length > 0 && tempPos) {
@@ -127,14 +115,7 @@ export const CanvasBoard = () => {
                 return [...filtered, ...rfNodes as any];
             });
 
-            // TODO: If we want edges, we need backend to return them or we link them locally?
-            // The invoke_chat_command returns nodes. It also creates relation in DB.
-            // But frontend needs edges to visualize connection.
-            // For now, let's just show nodes. Ideally verify edges too.
-            // Requirement says "connected...".
-            // If backend returns only nodes, we might need to fetch edges or reload graph.
-            // Optimistic approach: backend returns [UserNode, BotNode]. They are implicitly connected.
-            // We can create an edge between them locally.
+            // Handle edges if returned or implied
             if (newNodes.length >= 2) {
                 const source = getSafeId(newNodes[0].id);
                 const target = getSafeId(newNodes[1].id);
@@ -150,6 +131,20 @@ export const CanvasBoard = () => {
             console.error("Failed to invoke chat", e);
             // Error listener will likely catch the emitted error too.
         }
+    };
+
+    const transformBackendNode = (n: any): ChatNodeType => {
+        const nodeId = getSafeId(n.id);
+        return {
+            id: nodeId,
+            position: n.position,
+            data: {
+                content: (n.type as any)?.data?.value?.text || JSON.stringify(n.data),
+                title: (n.type as any)?.data?.value?.role === 'user' ? 'Me' : 'AI',
+                onDelete: handleDeleteNode
+            },
+            type: 'chatNode'
+        };
     };
 
     const { getViewport, getIntersectingNodes } = useReactFlow();
@@ -265,6 +260,37 @@ export const CanvasBoard = () => {
         };
         setNodes((nds) => [...nds, newNode]);
     };
+
+    useEffect(() => {
+        const loadGraph = async () => {
+            try {
+                // TODO: Dynamic canvas ID
+                const [backendNodes, backendEdges] = await GraphAPI.loadGraph("canvas:main");
+
+                if (backendNodes.length === 0) {
+                    // Empty canvas -> Auto create chat node
+                    handleAddNode();
+                } else {
+                    // Transform and set nodes
+                    const rfNodes = backendNodes.map(transformBackendNode);
+                    setNodes(rfNodes);
+
+                    // Transform and set edges
+                    const rfEdges = backendEdges.map(e => ({
+                        id: getSafeId(e.id) || `e-${e.source}-${e.target}`,
+                        source: getSafeId(e.source),
+                        target: getSafeId(e.target)
+                    }));
+                    setEdges(rfEdges);
+                }
+            } catch (e) {
+                console.error("Failed to load graph", e);
+                setError("Failed to load graph data");
+            }
+        };
+
+        loadGraph();
+    }, []);
 
     return (
         <main ref={containerRef} className="flex-1 h-screen w-full bg-background-light dark:bg-background-dark relative">

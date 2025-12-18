@@ -43,8 +43,23 @@ export const GraphAPI = {
         return await invoke('connect_edge_command', { edgeId, source, target });
     },
 
-    loadGraph: async (): Promise<[ChatNode[], FlowEdge[]]> => {
-        return await invoke('load_board_command');
+    loadGraph: async (canvasId: string = "canvas:main"): Promise<[ChatNode[], FlowEdge[]]> => {
+        const [nodes, derives, sequences] = await invoke<[ChatNode[], any[], any[]]>('load_canvas_command', { canvasId });
+
+        const edges: FlowEdge[] = [
+            ...derives.map(d => ({
+                id: d.id,
+                source: typeof d.from === 'object' && d.from.id ? `${d.from.tb}:${d.from.id}` : d.from,
+                target: typeof d.to === 'object' && d.to.id ? `${d.to.tb}:${d.to.id}` : d.to,
+            })),
+            ...sequences.map(s => ({
+                id: s.id,
+                source: typeof s.from === 'object' && s.from.id ? `${s.from.tb}:${s.from.id}` : s.from,
+                target: typeof s.to === 'object' && s.to.id ? `${s.to.tb}:${s.to.id}` : s.to,
+            }))
+        ];
+
+        return [nodes, edges];
     },
 
     invokeChat: async (canvasId: string, prompt: string): Promise<ChatNode[]> => {
