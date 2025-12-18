@@ -26,8 +26,11 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::save_node_command,
-            // commands::connect_edge_command,
+            commands::add_node_command,
+            commands::add_derived_node_command,
+            commands::add_sequenced_node_command,
+            commands::move_node_position_command,
+            commands::delete_node_command,
             commands::load_canvas_command
         ])
         .run(tauri::generate_context!())

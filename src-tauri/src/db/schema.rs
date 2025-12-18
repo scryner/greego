@@ -45,15 +45,6 @@ pub struct Holds {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum EdgeDirectionFrom {
-    Up,
-    Left,
-    Right,
-    Down,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Derives {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<Thing>,
@@ -62,7 +53,6 @@ pub struct Derives {
     #[serde(alias = "out")]
     pub to: Thing,
     pub canvas: Thing,
-    pub direction_from: EdgeDirectionFrom,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
