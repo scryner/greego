@@ -12,7 +12,7 @@ import '@xyflow/react/dist/style.css';
 
 import { ChatNode, type ChatNodeType } from './ChatNode';
 import { ModelSelector } from './ModelSelector';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { GraphAPI } from '../services/backend';
 
@@ -29,6 +29,12 @@ export const CanvasBoard = () => {
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
     const [error, setError] = useState<string | null>(null);
+
+    // Keep track of latest nodes for async callbacks
+    const nodesRef = useRef(nodes);
+    useEffect(() => {
+        nodesRef.current = nodes;
+    }, [nodes]);
 
     useEffect(() => {
         // Listen for backend errors
@@ -59,8 +65,27 @@ export const CanvasBoard = () => {
         }
     };
 
+    // Helper to safely convert backend ID to string
+    const getSafeId = (id: any): string => {
+        if (typeof id === 'string') return id;
+        if (typeof id === 'object' && id !== null) {
+            // Check for SurrealDB Thing structure
+            if ('tb' in id && 'id' in id) {
+                const innerId = typeof id.id === 'object' ? JSON.stringify(id.id) : id.id;
+                return `${id.tb}:${innerId}`;
+            }
+            // Fallback for other objects
+            return JSON.stringify(id);
+        }
+        return String(id);
+    };
+
     const handleChatSubmit = async (text: string, tempNodeId: string) => {
         try {
+            // Get current position of the temp node before async operation
+            const tempNode = nodesRef.current.find(n => n.id === tempNodeId);
+            const tempPos = tempNode ? { ...tempNode.position } : null;
+
             // Invoke backend
             // TODO: Use actual canvas ID. For now hardcoded or passed from somewhere? 
             // The prompt didn't specify multiple canvases, so "main" or similar is fine.
@@ -68,16 +93,32 @@ export const CanvasBoard = () => {
             const newNodes = await GraphAPI.invokeChat(canvasId, text);
 
             // Transform backend nodes to ReactFlow nodes
-            const rfNodes = newNodes.map(n => ({
-                id: n.id as string,
-                position: n.position,
-                data: {
-                    content: (n.type as any)?.data?.value?.text || JSON.stringify(n.data),
-                    title: (n.type as any)?.data?.value?.role === 'user' ? 'Me' : 'AI',
-                    onDelete: handleDeleteNode // Pass delete handler
-                },
-                type: 'chatNode'
-            }));
+            const rfNodes = newNodes.map(n => {
+                const nodeId = getSafeId(n.id);
+
+                return {
+                    id: nodeId,
+                    position: n.position,
+                    data: {
+                        content: (n.type as any)?.data?.value?.text || JSON.stringify(n.data),
+                        title: (n.type as any)?.data?.value?.role === 'user' ? 'Me' : 'AI',
+                        onDelete: handleDeleteNode // Pass delete handler
+                    },
+                    type: 'chatNode'
+                };
+            });
+
+            // If we found the temp node, adjust positions of new nodes to match
+            if (rfNodes.length > 0 && tempPos) {
+                const firstNode = rfNodes[0];
+                const dx = tempPos.x - firstNode.position.x;
+                const dy = tempPos.y - firstNode.position.y;
+
+                rfNodes.forEach(n => {
+                    n.position.x += dx;
+                    n.position.y += dy;
+                });
+            }
 
             // Replace temp node with real nodes
             setNodes((nds) => {
@@ -94,12 +135,12 @@ export const CanvasBoard = () => {
             // Optimistic approach: backend returns [UserNode, BotNode]. They are implicitly connected.
             // We can create an edge between them locally.
             if (newNodes.length >= 2) {
-                const source = newNodes[0].id as string;
-                const target = newNodes[1].id as string;
+                const source = getSafeId(newNodes[0].id);
+                const target = getSafeId(newNodes[1].id);
                 const newEdge: Edge = {
-                    id: `e-${source}-${target}`,
-                    source,
-                    target,
+                    id: `e-${source}-${target}`, // Use string IDs
+                    source: source,
+                    target: target,
                 };
                 setEdges((eds) => [...eds, newEdge]);
             }
@@ -135,7 +176,7 @@ export const CanvasBoard = () => {
                                 placeholder="Ask anything..."
                                 autoFocus
                                 onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
+                                    if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
                                         e.preventDefault();
                                         handleChatSubmit(e.currentTarget.value, id);
                                     }
