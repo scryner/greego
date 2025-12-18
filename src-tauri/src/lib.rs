@@ -39,7 +39,8 @@ pub fn run() {
             commands::add_sequenced_node_command,
             commands::move_node_position_command,
             commands::delete_node_command,
-            commands::load_canvas_command
+            commands::load_canvas_command,
+            commands::invoke_chat_command
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

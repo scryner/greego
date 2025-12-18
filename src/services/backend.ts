@@ -46,4 +46,12 @@ export const GraphAPI = {
     loadGraph: async (): Promise<[ChatNode[], FlowEdge[]]> => {
         return await invoke('load_board_command');
     },
+
+    invokeChat: async (canvasId: string, prompt: string): Promise<ChatNode[]> => {
+        return await invoke('invoke_chat_command', { canvasId, prompt });
+    },
+
+    deleteNode: async (nodeId: string): Promise<void> => {
+        return await invoke('delete_node_command', { nodeId });
+    },
 };
