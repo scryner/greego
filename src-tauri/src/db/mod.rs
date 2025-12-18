@@ -1,9 +1,10 @@
 use crate::db::event_loop::EventLoop;
 use crate::db::events::DbEvent;
 use crate::db::schema::{Derives, Node, Sequences};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use surrealdb::engine::local::{Db, RocksDb};
+use surrealdb::engine::local::{Db, Mem, RocksDb};
 use surrealdb::sql::Thing;
 use surrealdb::Surreal;
 use tauri::{AppHandle, Emitter};
@@ -22,9 +23,27 @@ pub struct Database {
     sender: mpsc::Sender<DbEvent>,
 }
 
+#[derive(Clone)]
+pub enum DatabaseConfig {
+    InMemory,
+    Persistent(PathBuf),
+}
+
 impl Database {
-    pub async fn init(app_handle: AppHandle) -> Result<Arc<Self>, surrealdb::Error> {
-        let client = Surreal::new::<RocksDb>("greego.db").await?;
+    pub async fn init(
+        app_handle: AppHandle,
+        config: DatabaseConfig,
+    ) -> Result<Arc<Self>, surrealdb::Error> {
+        let client = match config {
+            DatabaseConfig::InMemory => {
+                let client = Surreal::new::<Mem>(()).await?;
+                client
+            }
+            DatabaseConfig::Persistent(path) => {
+                let client = Surreal::new::<RocksDb>(path).await?;
+                client
+            }
+        };
         client.use_ns("greego").use_db("main").await?;
         let client = Arc::new(client);
 

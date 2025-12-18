@@ -6,7 +6,6 @@ import {
     MiniMap,
     useNodesState,
     useEdgesState,
-    Position,
     type Edge,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -18,58 +17,9 @@ const nodeTypes = {
 };
 
 // Initial Nodes Data
-const initialNodes: ChatNodeType[] = [
-    {
-        id: '1',
-        type: 'chatNode',
-        position: { x: 100, y: 100 },
-        data: {
-            title: 'hello',
-            content: (
-                <div className="p-4 h-40 overflow-y-auto">
-                    <p className="text-slate-600 dark:text-slate-300">hello, How are you?</p>
-                </div>
-            ),
-            containerClassName: 'w-80',
-            handles: {
-                source: [Position.Right, Position.Bottom],
-            }
-        },
-    },
-    {
-        id: '2',
-        type: 'chatNode',
-        position: { x: 500, y: 100 },
-        data: {
-            title: 'greeting',
-            content: (
-                <div className="p-4 h-32 flex flex-col justify-end">
-                    <div className="flex flex-col gap-3">
-                        <div className="relative w-full">
-                            <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 bg-slate-500 rounded-full text-white">
-                                <span className="material-icons-round text-[14px]">add</span>
-                            </div>
-                            <input className="w-full text-sm pl-9 pr-4 py-2 rounded-full bg-slate-200/50 dark:bg-slate-800 border-none focus:ring-0 placeholder-slate-500 text-slate-700 dark:text-slate-200 transition-colors" placeholder="Ask anything..." type="text" />
-                        </div>
-                        <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 px-1">
-                            <span className="text-xs font-medium">lms/gpt-oss-120b</span>
-                            <div className="flex-1"></div>
-                        </div>
-                    </div>
-                </div>
-            ),
-            containerClassName: 'w-80',
-            handles: {
-                target: [Position.Left],
-                source: [Position.Top]
-            }
-        },
-    },
-];
+const initialNodes: ChatNodeType[] = [];
 
-const initialEdges: Edge[] = [
-    { id: 'e1-2', source: '1', target: '2', animated: true },
-];
+const initialEdges: Edge[] = [];
 
 export const CanvasBoard = () => {
     const [nodes, , onNodesChange] = useNodesState(initialNodes);

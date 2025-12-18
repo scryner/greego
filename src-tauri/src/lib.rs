@@ -18,9 +18,15 @@ pub fn run() {
 
             // Initialize DB
             let app_handle = app.handle().clone();
+            // Default to InMemory for now, as requested.
+            // TODO: Make this configurable via config file or env var if needed.
+            let config = db::DatabaseConfig::InMemory;
+
             let db_arc =
-                tauri::async_runtime::block_on(async move { Database::init(app_handle).await })
-                    .expect("Failed to initialize database");
+                tauri::async_runtime::block_on(
+                    async move { Database::init(app_handle, config).await },
+                )
+                .expect("Failed to initialize database");
 
             // Manage the Database (cloning the struct which holds the Arc)
             app.manage((*db_arc).clone());
