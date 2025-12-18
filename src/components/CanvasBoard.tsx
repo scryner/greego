@@ -6,6 +6,7 @@ import {
     MiniMap,
     useNodesState,
     useEdgesState,
+    useReactFlow,
     type Edge,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -151,11 +152,82 @@ export const CanvasBoard = () => {
         }
     };
 
+    const { getViewport, getIntersectingNodes } = useReactFlow();
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    const findSmartPosition = (): { x: number, y: number } => {
+        if (!containerRef.current) return { x: 100, y: 100 };
+
+        const { width, height } = containerRef.current.getBoundingClientRect();
+        const { x: vx, y: vy, zoom } = getViewport();
+
+        // Convert screen dimensions to flow dimensions
+        // Visible area in flow coords
+        const visibleX = -vx / zoom;
+        const visibleY = -vy / zoom;
+        const visibleW = width / zoom;
+        const visibleH = height / zoom;
+
+        const NODE_WIDTH = 400; // Approx max width
+        const NODE_HEIGHT = 200; // Approx height
+
+        // Target: Top-Left area of visible screen (User defined "1st Quadrant")
+        // X range: [Left, Center]
+        // Y range: [Top, Center]
+
+        // Let's define a grid of potential positions in the visible area
+        // Priority: Top-Left -> Center -> Others
+
+        const candidates: { x: number, y: number }[] = [];
+
+        // Top-Left candidates
+        // Let's try to place it near the top-left center
+        candidates.push({ x: visibleX + visibleW * 0.25 - NODE_WIDTH / 2, y: visibleY + visibleH * 0.25 - NODE_HEIGHT / 2 });
+        candidates.push({ x: visibleX + visibleW * 0.4 - NODE_WIDTH / 2, y: visibleY + visibleH * 0.2 - NODE_HEIGHT / 2 });
+        candidates.push({ x: visibleX + visibleW * 0.2 - NODE_WIDTH / 2, y: visibleY + visibleH * 0.3 - NODE_HEIGHT / 2 });
+
+        // Center candidates
+        candidates.push({ x: visibleX + visibleW / 2 - NODE_WIDTH / 2, y: visibleY + visibleH / 2 - NODE_HEIGHT / 2 });
+
+        // Check for collisions
+        for (const pos of candidates) {
+            const rect = { ...pos, width: NODE_WIDTH, height: NODE_HEIGHT };
+            const collisions = getIntersectingNodes(rect);
+            if (collisions.length === 0) {
+                return pos;
+            }
+        }
+
+        // If all fail, try to find *any* open space in visible area with a simple scan
+        // Scan 4 quadrants
+        const STEPS = 4;
+        for (let i = 0; i < STEPS; i++) {
+            for (let j = 0; j < STEPS; j++) {
+                const x = visibleX + (visibleW / STEPS) * i;
+                const y = visibleY + (visibleH / STEPS) * j;
+                const rect = { x, y, width: NODE_WIDTH, height: NODE_HEIGHT };
+                if (getIntersectingNodes(rect).length === 0) {
+                    return { x, y };
+                }
+            }
+        }
+
+        // Fallback: Just offset from center slightly
+        return {
+            x: visibleX + visibleW / 2 - NODE_WIDTH / 2 + Math.random() * 50,
+            y: visibleY + visibleH / 2 - NODE_HEIGHT / 2 + Math.random() * 50
+        };
+    };
+
     const handleAddNode = () => {
         const id = `temp-${Date.now()}`;
+
+        // Calculate smart position
+        const position = findSmartPosition();
+
         const newNode: ChatNodeType = {
             id,
-            position: { x: 100, y: 100 }, // Initial position
+            position,
             type: 'chatNode',
             data: {
                 title: 'New chat', // Matches user request
@@ -195,7 +267,7 @@ export const CanvasBoard = () => {
     };
 
     return (
-        <main className="flex-1 h-screen w-full bg-background-light dark:bg-background-dark relative">
+        <main ref={containerRef} className="flex-1 h-screen w-full bg-background-light dark:bg-background-dark relative">
             <ReactFlow
                 nodes={nodes}
                 edges={edges}
