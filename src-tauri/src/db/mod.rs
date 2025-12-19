@@ -252,4 +252,19 @@ mod tests {
 
         // Just run tests to ensure no crash
     }
+    #[tokio::test]
+    async fn test_load_canvas_after_add_node() {
+        let db = setup_test_db().await;
+        // Use a clean canvas ID
+        let canvas_id = Thing::from(("canvas", "test_load"));
+        let node = mock_node();
+
+        let created_node = db.add_node(canvas_id.clone(), node).await.unwrap();
+        let created_id = created_node.id.unwrap();
+
+        // Verify we can load it back via load_canvas (which checks relations)
+        let (nodes, _, _) = db.load_canvas(canvas_id).await.unwrap();
+        assert_eq!(nodes.len(), 1, "Should find 1 node attached to canvas");
+        assert_eq!(nodes[0].id, Some(created_id), "ID should match");
+    }
 }

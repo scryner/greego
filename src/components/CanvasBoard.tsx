@@ -12,6 +12,7 @@ import {
 import '@xyflow/react/dist/style.css';
 
 import { ChatNode, type ChatNodeType } from './ChatNode';
+import { PromptInputNode, type PromptInputNodeType } from './PromptInputNode';
 import { ModelSelector } from './ModelSelector';
 import { useState, useEffect, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
@@ -19,15 +20,19 @@ import { GraphAPI } from '../services/backend';
 
 const nodeTypes = {
     chatNode: ChatNode,
+    promptInputNode: PromptInputNode,
 };
 
+// App node type (union of all node types)
+type AppNodeType = ChatNodeType | PromptInputNodeType;
+
 // Initial Nodes Data
-const initialNodes: ChatNodeType[] = [];
+const initialNodes: AppNodeType[] = [];
 
 const initialEdges: Edge[] = [];
 
 export const CanvasBoard = () => {
-    const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+    const [nodes, setNodes, onNodesChange] = useNodesState<AppNodeType>(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
     const [error, setError] = useState<string | null>(null);
 
@@ -115,16 +120,18 @@ export const CanvasBoard = () => {
                 return [...filtered, ...rfNodes as any];
             });
 
-            // Handle edges if returned or implied
+            // Handle edges if returned (e.g. if multiple nodes are returned in the future)
             if (newNodes.length >= 2) {
-                const source = getSafeId(newNodes[0].id);
-                const target = getSafeId(newNodes[1].id);
-                const newEdge: Edge = {
-                    id: `e-${source}-${target}`, // Use string IDs
-                    source: source,
-                    target: target,
-                };
-                setEdges((eds) => [...eds, newEdge]);
+                for (let i = 0; i < newNodes.length - 1; i++) {
+                    const source = getSafeId(newNodes[i].id);
+                    const target = getSafeId(newNodes[i + 1].id);
+                    const newEdge: Edge = {
+                        id: `e-${source}-${target}`,
+                        source: source,
+                        target: target,
+                    };
+                    setEdges((eds) => [...eds, newEdge]);
+                }
             }
 
         } catch (e) {
@@ -135,12 +142,14 @@ export const CanvasBoard = () => {
 
     const transformBackendNode = (n: any): ChatNodeType => {
         const nodeId = getSafeId(n.id);
+        const nodeData = (n.type as any)?.data?.value || n.data;
+
         return {
             id: nodeId,
             position: n.position,
             data: {
-                content: (n.type as any)?.data?.value?.text || JSON.stringify(n.data),
-                title: (n.type as any)?.data?.value?.role === 'user' ? 'Me' : 'AI',
+                content: nodeData?.text || JSON.stringify(nodeData),
+                title: nodeData?.prompt || (nodeData?.role === 'user' ? 'Me' : 'AI'),
                 onDelete: handleDeleteNode
             },
             type: 'chatNode'
@@ -220,55 +229,48 @@ export const CanvasBoard = () => {
         // Calculate smart position
         const position = findSmartPosition();
 
-        const newNode: ChatNodeType = {
+        const newNode: PromptInputNodeType = {
             id,
             position,
-            type: 'chatNode',
+            type: 'promptInputNode',
             data: {
-                title: 'New chat', // Matches user request
+                title: 'New chat',
                 footer: (
                     <ModelSelector
                         currentModel="lms/gpt-oss-120b"
                         onModelSelect={(model) => console.log("Selected model:", model)}
                     />
                 ),
-                onDelete: handleDeleteNode, // Pass delete handler
-                content: (
-                    <div className="w-full">
-                        {/* Pill-shaped input container */}
-                        <div className="relative group">
-                            <input
-                                type="text"
-                                className="w-full pl-10 pr-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-full text-sm text-slate-700 dark:text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
-                                placeholder="Ask anything..."
-                                autoFocus
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
-                                        e.preventDefault();
-                                        handleChatSubmit(e.currentTarget.value, id);
-                                    }
-                                }}
-                            />
-                            {/* Plus icon inside the input */}
-                            <div className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 bg-slate-500 dark:bg-slate-600 rounded-full flex items-center justify-center text-white pointer-events-none">
-                                <span className="material-icons-round text-sm">add</span>
-                            </div>
-                        </div>
-                    </div>
-                ),
+                onDelete: handleDeleteNode,
+                onSubmit: handleChatSubmit,
             },
         };
         setNodes((nds) => [...nds, newNode]);
     };
 
     useEffect(() => {
+        let ignore = false;
+
         const loadGraph = async () => {
             try {
                 // TODO: Dynamic canvas ID
                 const [backendNodes, backendEdges] = await GraphAPI.loadGraph("canvas:main");
 
+                if (ignore) return;
+
                 if (backendNodes.length === 0) {
                     // Empty canvas -> Auto create chat node
+                    // Verify we haven't already added one (double safety)
+                    setNodes(current => {
+                        if (current.length > 0) return current;
+                        // Need to invoke handleAddNode logic, but since we are inside setNodes, 
+                        // we can't call handleAddNode directly as it calls setNodes.
+                        // We duplicate the simple creation logic here or refactor.
+                        // Ideally, we move initialization out.
+                        // For now, let's just use the handleAddNode ONLY if not ignored.
+                        return current; // Return current to break the flow, handle via outside
+                    });
+                    // Use specific call outside setNodes
                     handleAddNode();
                 } else {
                     // Transform and set nodes
@@ -284,12 +286,18 @@ export const CanvasBoard = () => {
                     setEdges(rfEdges);
                 }
             } catch (e) {
-                console.error("Failed to load graph", e);
-                setError("Failed to load graph data");
+                if (!ignore) {
+                    console.error("Failed to load graph", e);
+                    setError("Failed to load graph data");
+                }
             }
         };
 
         loadGraph();
+
+        return () => {
+            ignore = true;
+        };
     }, []);
 
     return (
