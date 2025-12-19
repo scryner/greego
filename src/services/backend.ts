@@ -69,4 +69,8 @@ export const GraphAPI = {
     deleteNode: async (nodeId: string): Promise<void> => {
         return await invoke('delete_node_command', { nodeId });
     },
+
+    moveNodePosition: async (nodeId: string, x: number, y: number): Promise<void> => {
+        return await invoke('move_node_position_command', { nodeId, x, y });
+    },
 };

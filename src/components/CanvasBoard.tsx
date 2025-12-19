@@ -308,6 +308,14 @@ export const CanvasBoard = () => {
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 nodeTypes={nodeTypes}
+                onNodeDragStop={(_, node) => {
+                    const id = getSafeId(node.id);
+                    // Don't save temp nodes
+                    if (!id.startsWith('temp-')) {
+                        GraphAPI.moveNodePosition(id, node.position.x, node.position.y)
+                            .catch(e => console.error("Failed to save node position", e));
+                    }
+                }}
 
                 defaultViewport={{ x: 0, y: 0, zoom: 0.85 }}
                 className="bg-background-light dark:bg-background-dark"
