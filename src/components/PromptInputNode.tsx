@@ -4,6 +4,8 @@ import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 
 export type PromptInputNodeData = {
     title?: string;
+    parentId?: string;
+    relationType?: 'sequence' | 'derive';
     footer?: ReactNode;
     headerClassName?: string;
     containerClassName?: string;
@@ -34,11 +36,12 @@ export const PromptInputNode = ({ id, data }: NodeProps<PromptInputNodeType>) =>
     return (
         <div className={`bg-white dark:bg-surface-dark rounded-2xl shadow-sm border border-slate-200 dark:border-border-dark flex flex-col min-w-[320px] max-w-[400px] transition-shadow hover:shadow-md ${containerClassName} relative group`}>
             {/* Target Handles (Inputs) */}
-            {handles.target?.map((pos, index) => (
+            {handles.target?.map((pos) => (
                 <Handle
-                    key={`target-${index}`}
+                    key={`target-${pos}`}
                     type="target"
                     position={pos}
+                    id={`target-${pos}`}
                     className="!w-3 !h-3 !bg-slate-300 dark:!bg-slate-500 !border-2 !border-white dark:!border-slate-800"
                 />
             ))}
@@ -123,11 +126,12 @@ export const PromptInputNode = ({ id, data }: NodeProps<PromptInputNodeType>) =>
             )}
 
             {/* Source Handles (Outputs) */}
-            {handles.source?.map((pos, index) => (
+            {handles.source?.map((pos) => (
                 <Handle
-                    key={`source-${index}`}
+                    key={`source-${pos}`}
                     type="source"
                     position={pos}
+                    id={`source-${pos}`}
                     className="!w-3 !h-3 !bg-slate-300 dark:!bg-slate-500 !border-2 !border-white dark:!border-slate-800"
                 />
             ))}

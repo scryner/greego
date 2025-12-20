@@ -111,6 +111,8 @@ pub async fn invoke_chat_command(
     prompt: String,
     x: f64,
     y: f64,
+    parent_id: Option<String>,
+    relation_type: Option<String>,
 ) -> Result<Vec<Node>, String> {
     use crate::db::schema::{NodePosition, NodeType};
     use serde_json::json;
@@ -140,10 +142,38 @@ pub async fn invoke_chat_command(
         },
     };
 
-    let saved_node = state
-        .add_node(canvas_thing, chat_node)
-        .await
-        .map_err(|e| e.to_string())?;
+    let saved_node = if let Some(parent_id) = parent_id {
+        let (tb, id_str) = parent_id
+            .split_once(':')
+            .ok_or("Invalid Parent ID format. Expected 'table:id'")?;
+        let parent_thing = surrealdb::sql::Thing::from((tb.to_string(), id_str.to_string()));
+
+        match relation_type.as_deref() {
+            Some("sequence") => state
+                .add_sequenced_node(canvas_thing, parent_thing, chat_node)
+                .await
+                .map_err(|e| e.to_string())?,
+            Some("derive") => state
+                .add_derived_node(canvas_thing, parent_thing, chat_node)
+                .await
+                .map_err(|e| e.to_string())?,
+            _ => {
+                // Default or fallback if relation type is unknown, treated as standalone for now or error?
+                // Let's fallback to derived for safety or standalone.
+                // Given the requirement, specific types are needed.
+                // If we have parent but no valid type, let's error or default to derived.
+                state
+                    .add_derived_node(canvas_thing, parent_thing, chat_node)
+                    .await
+                    .map_err(|e| e.to_string())?
+            }
+        }
+    } else {
+        state
+            .add_node(canvas_thing, chat_node)
+            .await
+            .map_err(|e| e.to_string())?
+    };
 
     Ok(vec![saved_node])
 }

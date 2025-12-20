@@ -7,6 +7,7 @@ import {
     useNodesState,
     useEdgesState,
     useReactFlow,
+    Position,
     type Edge,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -45,6 +46,11 @@ export const CanvasBoard = () => {
     useEffect(() => {
         nodesRef.current = nodes;
     }, [nodes]);
+
+    const edgesRef = useRef(edges);
+    useEffect(() => {
+        edgesRef.current = edges;
+    }, [edges]);
 
     useEffect(() => {
         // Listen for backend errors
@@ -100,16 +106,20 @@ export const CanvasBoard = () => {
             // Get current position of the temp node before async operation
             const tempNode = nodesRef.current.find(n => n.id === tempNodeId);
             const tempPos = tempNode ? { ...tempNode.position } : null;
+            // Safe cast or check
+            const nodeData = tempNode?.data as any;
+            const parentId = nodeData?.parentId;
+            const relationType = nodeData?.relationType;
 
             // Invoke backend
-            // TODO: Use actual canvas ID. For now hardcoded or passed from somewhere? 
-            // The prompt didn't specify multiple canvases, so "main" or similar is fine.
             const canvasId = "canvas:main";
             const newNodes = await GraphAPI.invokeChat(
                 canvasId,
                 text,
                 tempPos ? tempPos.x : 0,
-                tempPos ? tempPos.y : 0
+                tempPos ? tempPos.y : 0,
+                parentId,
+                relationType
             );
 
             // Transform backend nodes to ReactFlow nodes
@@ -148,6 +158,25 @@ export const CanvasBoard = () => {
                 }
             }
 
+            // Restore connection derived from temp node
+            if (parentId && newNodes.length > 0) {
+                const newRealNodeId = getSafeId(newNodes[0].id);
+                // Find the edge that was connected to the temp node
+                const tempEdge = edgesRef.current.find(e => e.target === tempNodeId);
+                if (tempEdge) {
+                    const restoredEdge: Edge = {
+                        id: `e-${parentId}-${newRealNodeId}`,
+                        source: parentId,
+                        target: newRealNodeId,
+                        sourceHandle: tempEdge.sourceHandle,
+                        targetHandle: tempEdge.targetHandle,
+                        animated: tempEdge.animated,
+                        style: tempEdge.style,
+                    };
+                    setEdges(eds => [...eds, restoredEdge]);
+                }
+            }
+
         } catch (e) {
             console.error("Failed to invoke chat", e);
             // Error listener will likely catch the emitted error too.
@@ -164,7 +193,12 @@ export const CanvasBoard = () => {
             data: {
                 content: nodeData?.text || JSON.stringify(nodeData),
                 title: nodeData?.prompt || (nodeData?.role === 'user' ? 'Me' : 'AI'),
-                onDelete: handleDeleteNode
+                onDelete: handleDeleteNode,
+                onAddNode: (direction) => handleAddNodeAtDirection(nodeId, direction),
+                handles: {
+                    source: [Position.Top, Position.Bottom, Position.Left, Position.Right],
+                    target: [Position.Top, Position.Bottom, Position.Left, Position.Right],
+                }
             },
             type: 'chatNode'
         };
@@ -260,6 +294,89 @@ export const CanvasBoard = () => {
             },
         };
         setNodes((nds) => [...nds, newNode]);
+    };
+
+    const handleAddNodeAtDirection = (nodeId: string, direction: 'top' | 'bottom' | 'left' | 'right') => {
+        const parentNode = nodesRef.current.find(n => n.id === nodeId);
+        if (!parentNode) {
+            console.warn("Parent node not found:", nodeId);
+            return;
+        }
+
+        const id = `temp-${Date.now()}`;
+        const offset = 40; // Space between nodes
+        const width = 400; // Estimated max width
+        const height = 150; // Estimated height
+
+        let { x, y } = parentNode.position;
+        let sourceHandle = '';
+        let targetHandle = '';
+        let relationType: 'sequence' | 'derive' = 'derive';
+        let isSequence = false;
+
+        switch (direction) {
+            case 'top':
+                y -= (height + offset);
+                sourceHandle = 'source-top';
+                targetHandle = 'target-bottom';
+                break;
+            case 'bottom':
+                y += (height + offset);
+                sourceHandle = 'source-bottom';
+                targetHandle = 'target-top';
+                relationType = 'sequence';
+                isSequence = true;
+                break;
+            case 'left':
+                x -= (width + offset);
+                sourceHandle = 'source-left';
+                targetHandle = 'target-right';
+                break;
+            case 'right':
+                x += (width + offset);
+                sourceHandle = 'source-right';
+                targetHandle = 'target-left';
+                break;
+        }
+
+        const newNode: PromptInputNodeType = {
+            id,
+            position: { x, y },
+            type: 'promptInputNode',
+            data: {
+                title: 'New chat',
+                parentId: nodeId, // Store parent ID
+                relationType: relationType, // Store relation type
+                footer: (
+                    <ModelSelector
+                        currentModel="lms/gpt-oss-120b"
+                        onModelSelect={(model) => console.log("Selected model:", model)}
+                    />
+                ),
+                onDelete: handleDeleteNode,
+                onSubmit: handleChatSubmit,
+                handles: {
+                    source: [],
+                    target: direction === 'top' ? [Position.Bottom] :
+                        direction === 'bottom' ? [Position.Top] :
+                            direction === 'left' ? [Position.Right] :
+                                [Position.Left],
+                }
+            },
+        };
+        setNodes((nds) => [...nds, newNode]);
+
+        // Create Edge
+        const newEdge: Edge = {
+            id: `e-${nodeId}-${id}-${Date.now()}`,
+            source: nodeId,
+            target: id,
+            sourceHandle: sourceHandle,
+            targetHandle: targetHandle,
+            animated: isSequence, // Dotted line (often animated property in default edges or custom styling)
+            style: isSequence ? { strokeDasharray: '5,5' } : undefined, // Explicit dotted style
+        };
+        setEdges((eds) => [...eds, newEdge]);
     };
 
     useEffect(() => {

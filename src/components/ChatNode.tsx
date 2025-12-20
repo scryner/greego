@@ -9,6 +9,7 @@ export type ChatNodeData = {
     headerClassName?: string;
     containerClassName?: string;
     onDelete?: (id: string) => void;
+    onAddNode?: (direction: 'top' | 'bottom' | 'left' | 'right') => void;
     handles?: {
         source?: Position[];
         target?: Position[];
@@ -26,6 +27,7 @@ export const ChatNode = ({ id, data }: NodeProps<ChatNodeType>) => {
         headerClassName = "border-b border-border-light dark:border-border-dark",
         containerClassName = "",
         onDelete,
+        onAddNode,
         handles = { source: [], target: [] }
     } = data;
 
@@ -34,11 +36,12 @@ export const ChatNode = ({ id, data }: NodeProps<ChatNodeType>) => {
     return (
         <div className={`bg-white dark:bg-surface-dark rounded-2xl shadow-sm border border-slate-200 dark:border-border-dark flex flex-col min-w-[320px] max-w-[400px] transition-shadow hover:shadow-md ${containerClassName} relative group`}>
             {/* Target Handles (Inputs) */}
-            {handles.target?.map((pos, index) => (
+            {handles.target?.map((pos) => (
                 <Handle
-                    key={`target-${index}`}
+                    key={`target-${pos}`}
                     type="target"
                     position={pos}
+                    id={`target-${pos}`}
                     className="!w-3 !h-3 !bg-slate-300 dark:!bg-slate-500 !border-2 !border-white dark:!border-slate-800"
                 />
             ))}
@@ -110,14 +113,39 @@ export const ChatNode = ({ id, data }: NodeProps<ChatNodeType>) => {
             )}
 
             {/* Source Handles (Outputs) */}
-            {handles.source?.map((pos, index) => (
+            {handles.source?.map((pos) => (
                 <Handle
-                    key={`source-${index}`}
+                    key={`source-${pos}`}
                     type="source"
                     position={pos}
+                    id={`source-${pos}`}
                     className="!w-3 !h-3 !bg-slate-300 dark:!bg-slate-500 !border-2 !border-white dark:!border-slate-800"
                 />
             ))}
+
+            {/* Interactive Dots for adding new nodes */}
+            <div className="absolute inset-0 pointer-events-none">
+                <div
+                    onClick={(e) => { e.stopPropagation(); onAddNode?.('top'); }}
+                    className="absolute -top-1 left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-slate-400 dark:bg-slate-600 rounded-full opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:scale-125 transition-all cursor-pointer pointer-events-auto z-10"
+                    title="Add node above"
+                />
+                <div
+                    onClick={(e) => { e.stopPropagation(); onAddNode?.('bottom'); }}
+                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-slate-400 dark:bg-slate-600 rounded-full opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:scale-125 transition-all cursor-pointer pointer-events-auto z-10"
+                    title="Add node below"
+                />
+                <div
+                    onClick={(e) => { e.stopPropagation(); onAddNode?.('left'); }}
+                    className="absolute top-1/2 -left-1 -translate-y-1/2 w-2.5 h-2.5 bg-slate-400 dark:bg-slate-600 rounded-full opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:scale-125 transition-all cursor-pointer pointer-events-auto z-10"
+                    title="Add node to the left"
+                />
+                <div
+                    onClick={(e) => { e.stopPropagation(); onAddNode?.('right'); }}
+                    className="absolute top-1/2 -right-1 -translate-y-1/2 w-2.5 h-2.5 bg-slate-400 dark:bg-slate-600 rounded-full opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:scale-125 transition-all cursor-pointer pointer-events-auto z-10"
+                    title="Add node to the right"
+                />
+            </div>
         </div>
     );
 };
