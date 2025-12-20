@@ -150,13 +150,97 @@ impl LlmService for GoogleService {
 
     async fn chat_stream(
         &self,
-        _input: LlmInput,
+        input: LlmInput,
     ) -> anyhow::Result<
         std::pin::Pin<
             Box<dyn futures::Stream<Item = anyhow::Result<crate::llm::LlmStreamChunk>> + Send>,
         >,
     > {
-        Err(anyhow::anyhow!("Google stream not implemented yet"))
+        let mut contents = Vec::new();
+
+        for msg in input.history {
+            contents.push(convert_message(msg));
+        }
+        contents.push(convert_message(input.user_input));
+
+        let system_instruction = input.system_prompt.map(|prompt| GoogleContent {
+            role: "user".to_string(),
+            parts: vec![GooglePart {
+                text: Some(prompt),
+                inline_data: None,
+            }],
+        });
+
+        let request_body = GenerateContentRequest {
+            contents,
+            system_instruction,
+        };
+
+        // Use streamGenerateContent with alt=sse for Server-Sent Events
+        let url = format!(
+            "https://generativelanguage.googleapis.com/v1beta/models/{}:streamGenerateContent?key={}&alt=sse",
+            self.model, self.api_key
+        );
+
+        let response = self.client.post(&url).json(&request_body).send().await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return Err(anyhow::anyhow!("Google API Error: {} - {}", status, text));
+        }
+
+        let stream = response.bytes_stream();
+        let stream = futures::StreamExt::map(stream, |chunk_result| {
+            chunk_result.map_err(|e| anyhow::anyhow!("Stream error: {}", e))
+        });
+
+        // SSE Parser for Google
+        let stream = async_stream::try_stream! {
+            let mut buffer = String::new();
+
+            for await chunk in stream {
+                let bytes = chunk?;
+                let text = String::from_utf8_lossy(&bytes);
+                buffer.push_str(&text);
+
+                while let Some(line_end) = buffer.find('\n') {
+                    let line = buffer[..line_end].trim();
+                    let line_content = line.to_string();
+                    buffer = buffer[line_end + 1..].to_string();
+
+                    if line_content.is_empty() {
+                        continue;
+                    }
+
+                    if line_content.starts_with("data: ") {
+                        let data = &line_content["data: ".len()..];
+                        if data == "[DONE]" {
+                            break;
+                        }
+
+                        if let Ok(response_body) = serde_json::from_str::<GenerateContentResponse>(data) {
+                           if let Some(candidates) = response_body.candidates {
+                               if let Some(first_candidate) = candidates.first() {
+                                   if let Some(ref parts) = first_candidate.content.parts {
+                                       for part in parts {
+                                           if let Some(ref text) = part.text {
+                                               yield crate::llm::LlmStreamChunk {
+                                                   content: text.clone(),
+                                                   usage: None,
+                                               };
+                                           }
+                                       }
+                                   }
+                               }
+                           }
+                        }
+                    }
+                }
+            }
+        };
+
+        Ok(Box::pin(stream))
     }
 }
 
@@ -206,4 +290,85 @@ fn convert_message(msg: Message) -> GoogleContent {
         .collect();
 
     GoogleContent { role, parts }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+
+    fn get_api_key() -> String {
+        env::var("GOOGLE_API_KEY")
+            .or_else(|_| env::var("GEMINI_API_KEY"))
+            .expect("GOOGLE_API_KEY or GEMINI_API_KEY must be set")
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_google_completion() {
+        let api_key = get_api_key();
+        let service = GoogleService::new(
+            api_key,
+            "gemini-2.5-flash".to_string(),
+            Duration::from_secs(30),
+        );
+
+        let input = LlmInput {
+            system_prompt: Some("You are a helpful assistant.".to_string()),
+            history: vec![],
+            user_input: Message::new_text(Role::User, "Hello, tell me a short joke."),
+        };
+
+        let result = service.chat_completion(input).await;
+
+        match result {
+            Ok(output) => {
+                println!("Success! Output: {:?}", output);
+                assert!(!output.content.is_empty(), "Content should not be empty");
+            }
+            Err(e) => panic!("Failed to get completion: {}", e),
+        }
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_google_stream() {
+        use futures::StreamExt;
+
+        let api_key = get_api_key();
+        let service = GoogleService::new(
+            api_key,
+            "gemini-2.5-flash".to_string(),
+            Duration::from_secs(30),
+        );
+        let input = LlmInput {
+            system_prompt: Some("You are a helpful assistant.".to_string()),
+            history: vec![],
+            user_input: Message::new_text(Role::User, "Hello, tell me a short joke."),
+        };
+
+        let result = service.chat_stream(input).await;
+
+        match result {
+            Ok(mut stream) => {
+                println!("Success! Stream started.");
+                let mut full_text = String::new();
+                while let Some(chunk_res) = stream.next().await {
+                    match chunk_res {
+                        Ok(chunk) => {
+                            print!("{}", chunk.content);
+                            full_text.push_str(&chunk.content);
+                        }
+                        Err(e) => println!("Chunk error: {}", e),
+                    }
+                }
+                println!("\nStream finished. Full text: {}", full_text);
+                assert!(
+                    !full_text.is_empty(),
+                    "Streamed content should not be empty"
+                );
+            }
+            Err(e) => panic!("Failed to get stream: {}", e),
+        }
+    }
 }
