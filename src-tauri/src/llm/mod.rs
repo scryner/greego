@@ -63,7 +63,21 @@ pub struct LlmOutput {
     pub raw: Option<Value>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LlmStreamChunk {
+    pub content: String, // Simplified for now, just text delta
+    pub usage: Option<TokenUsage>,
+}
+
+use futures::Stream;
+use std::pin::Pin;
+
 #[async_trait]
 pub trait LlmService: Send + Sync {
     async fn chat_completion(&self, input: LlmInput) -> anyhow::Result<LlmOutput>;
+
+    async fn chat_stream(
+        &self,
+        input: LlmInput,
+    ) -> anyhow::Result<Pin<Box<dyn Stream<Item = anyhow::Result<LlmStreamChunk>> + Send>>>;
 }

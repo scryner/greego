@@ -95,9 +95,7 @@ impl LlmService for GoogleService {
         contents.push(convert_message(input.user_input));
 
         let system_instruction = input.system_prompt.map(|prompt| GoogleContent {
-            role: "user".to_string(), // System instructions are technically 'user' role in some contexts or separate field.
-            // Actually, for Gemini 1.5 format, system_instruction is a separate field with role 'model' or just content?
-            // Checking API spec: 'system_instruction' field, Content type.
+            role: "user".to_string(),
             parts: vec![GooglePart {
                 text: Some(prompt),
                 inline_data: None,
@@ -146,8 +144,19 @@ impl LlmService for GoogleService {
         Ok(LlmOutput {
             content,
             usage,
-            raw: None, // Could capture full response if needed
+            raw: None,
         })
+    }
+
+    async fn chat_stream(
+        &self,
+        _input: LlmInput,
+    ) -> anyhow::Result<
+        std::pin::Pin<
+            Box<dyn futures::Stream<Item = anyhow::Result<crate::llm::LlmStreamChunk>> + Send>,
+        >,
+    > {
+        Err(anyhow::anyhow!("Google stream not implemented yet"))
     }
 }
 

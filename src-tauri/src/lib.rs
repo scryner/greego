@@ -3,6 +3,9 @@ pub mod db;
 pub mod llm;
 
 use db::Database;
+use llm::{openai::OpenAiCompatibleService, LlmService};
+use std::sync::Arc;
+use std::time::Duration;
 use tauri::Manager;
 use tauri_plugin_log::fern::colors::ColoredLevelConfig;
 
@@ -33,6 +36,17 @@ pub fn run() {
 
             // Manage the Database (cloning the struct which holds the Arc)
             app.manage((*db_arc).clone());
+
+            // Initialize LLM Service
+            // TODO: Load from config
+            let llm_service = OpenAiCompatibleService::new(
+                "http://192.168.0.130:1234/v1".to_string(), // Default for dev?
+                Some("lm-studio".to_string()),
+                "gpt-oss-120b".to_string(),
+                Duration::from_secs(60),
+            );
+            let llm_service_arc: Arc<dyn LlmService + Send + Sync> = Arc::new(llm_service);
+            app.manage(llm_service_arc);
 
             Ok(())
         })

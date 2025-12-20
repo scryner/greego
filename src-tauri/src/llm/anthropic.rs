@@ -88,8 +88,6 @@ impl LlmService for AnthropicService {
         messages.push(convert_message(input.user_input));
 
         let system = input.system_prompt;
-        // Default max tokens if not specified.
-        // TODO: Make this configurable or dynamic.
         let max_tokens = 4096;
 
         let request_body = CreateMessageRequest {
@@ -137,6 +135,17 @@ impl LlmService for AnthropicService {
             }),
             raw: None,
         })
+    }
+
+    async fn chat_stream(
+        &self,
+        _input: LlmInput,
+    ) -> anyhow::Result<
+        std::pin::Pin<
+            Box<dyn futures::Stream<Item = anyhow::Result<crate::llm::LlmStreamChunk>> + Send>,
+        >,
+    > {
+        Err(anyhow::anyhow!("Anthropic stream not implemented yet"))
     }
 }
 
