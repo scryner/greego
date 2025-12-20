@@ -447,6 +447,7 @@ export const CanvasBoard = () => {
     return (
         <main ref={containerRef} className="flex-1 h-screen w-full bg-background-light dark:bg-background-dark relative">
             <ReactFlow
+                proOptions={{ hideAttribution: true }}
                 nodes={nodes}
                 edges={edges}
                 onNodesChange={onNodesChange}
