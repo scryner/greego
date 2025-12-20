@@ -62,7 +62,7 @@ impl Database {
             client.clone(),
             receiver,
             err_tx,
-            Duration::from_millis(100),
+            Duration::from_millis(500),
             50,
             1000,
         );

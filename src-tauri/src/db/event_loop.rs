@@ -205,7 +205,7 @@ mod tests {
             client.clone(),
             receiver,
             err_tx,
-            Duration::from_millis(10),
+            Duration::from_millis(50),
             50,
             1000,
         );
