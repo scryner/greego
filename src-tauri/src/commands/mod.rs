@@ -8,7 +8,10 @@ pub async fn load_canvas_command(
     state: State<'_, Database>,
     canvas_id: String,
 ) -> Result<(Vec<Node>, Vec<Derives>, Vec<Sequences>), String> {
-    let thing = surrealdb::sql::thing(&canvas_id).map_err(|e| e.to_string())?;
+    let (tb, id_str) = canvas_id
+        .split_once(':')
+        .ok_or("Invalid ID format. Expected 'table:id'")?;
+    let thing = surrealdb::sql::Thing::from((tb.to_string(), id_str.to_string()));
     state.load_canvas(thing).await.map_err(|e| e.to_string())
 }
 
@@ -17,7 +20,10 @@ pub async fn delete_node_command(
     state: State<'_, Database>,
     node_id: String,
 ) -> Result<(), String> {
-    let thing = surrealdb::sql::thing(&node_id).map_err(|e| e.to_string())?;
+    let (tb, id_str) = node_id
+        .split_once(':')
+        .ok_or("Invalid ID format. Expected 'table:id'")?;
+    let thing = surrealdb::sql::Thing::from((tb.to_string(), id_str.to_string()));
     state.delete_node(thing).await.map_err(|e| e.to_string())
 }
 
@@ -27,7 +33,10 @@ pub async fn add_node_command(
     canvas_id: String,
     node: Node,
 ) -> Result<Node, String> {
-    let canvas_thing = surrealdb::sql::thing(&canvas_id).map_err(|e| e.to_string())?;
+    let (tb, id_str) = canvas_id
+        .split_once(':')
+        .ok_or("Invalid ID format. Expected 'table:id'")?;
+    let canvas_thing = surrealdb::sql::Thing::from((tb.to_string(), id_str.to_string()));
     state
         .add_node(canvas_thing, node)
         .await
@@ -41,8 +50,15 @@ pub async fn add_derived_node_command(
     from_id: String,
     to_node: Node,
 ) -> Result<Node, String> {
-    let canvas_thing = surrealdb::sql::thing(&canvas_id).map_err(|e| e.to_string())?;
-    let from_thing = surrealdb::sql::thing(&from_id).map_err(|e| e.to_string())?;
+    let (tb, id_str) = canvas_id
+        .split_once(':')
+        .ok_or("Invalid ID format. Expected 'table:id'")?;
+    let canvas_thing = surrealdb::sql::Thing::from((tb.to_string(), id_str.to_string()));
+
+    let (tb, id_str) = from_id
+        .split_once(':')
+        .ok_or("Invalid ID format. Expected 'table:id'")?;
+    let from_thing = surrealdb::sql::Thing::from((tb.to_string(), id_str.to_string()));
     state
         .add_derived_node(canvas_thing, from_thing, to_node)
         .await
@@ -56,8 +72,15 @@ pub async fn add_sequenced_node_command(
     from_id: String,
     to_node: Node,
 ) -> Result<Node, String> {
-    let canvas_thing = surrealdb::sql::thing(&canvas_id).map_err(|e| e.to_string())?;
-    let from_thing = surrealdb::sql::thing(&from_id).map_err(|e| e.to_string())?;
+    let (tb, id_str) = canvas_id
+        .split_once(':')
+        .ok_or("Invalid ID format. Expected 'table:id'")?;
+    let canvas_thing = surrealdb::sql::Thing::from((tb.to_string(), id_str.to_string()));
+
+    let (tb, id_str) = from_id
+        .split_once(':')
+        .ok_or("Invalid ID format. Expected 'table:id'")?;
+    let from_thing = surrealdb::sql::Thing::from((tb.to_string(), id_str.to_string()));
     state
         .add_sequenced_node(canvas_thing, from_thing, to_node)
         .await
@@ -71,7 +94,10 @@ pub async fn move_node_position_command(
     x: f64,
     y: f64,
 ) -> Result<Node, String> {
-    let node_thing = surrealdb::sql::thing(&node_id).map_err(|e| e.to_string())?;
+    let (tb, id_str) = node_id
+        .split_once(':')
+        .ok_or("Invalid ID format. Expected 'table:id'")?;
+    let node_thing = surrealdb::sql::Thing::from((tb.to_string(), id_str.to_string()));
     state
         .move_node_position(node_thing, x, y)
         .await
@@ -83,12 +109,17 @@ pub async fn invoke_chat_command(
     state: State<'_, Database>,
     canvas_id: String,
     prompt: String,
+    x: f64,
+    y: f64,
 ) -> Result<Vec<Node>, String> {
     use crate::db::schema::{NodePosition, NodeType};
     use serde_json::json;
     use std::time::Duration;
 
-    let canvas_thing = surrealdb::sql::thing(&canvas_id).map_err(|e| e.to_string())?;
+    let (tb, id_str) = canvas_id
+        .split_once(':')
+        .ok_or("Invalid ID format. Expected 'table:id'")?;
+    let canvas_thing = surrealdb::sql::Thing::from((tb.to_string(), id_str.to_string()));
 
     // 1. Simulate LLM Delay
     tokio::time::sleep(Duration::from_secs(1)).await;
@@ -99,7 +130,7 @@ pub async fn invoke_chat_command(
 
     let chat_node = Node {
         id: None,
-        position: NodePosition { x: 0.0, y: 0.0 },
+        position: NodePosition { x, y },
         type_: NodeType::Chat {
             value: json!({
                 "prompt": prompt,

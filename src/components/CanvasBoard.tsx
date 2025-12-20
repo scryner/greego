@@ -77,7 +77,12 @@ export const CanvasBoard = () => {
         if (typeof id === 'object' && id !== null) {
             // Check for SurrealDB Thing structure
             if ('tb' in id && 'id' in id) {
-                const innerId = typeof id.id === 'object' ? JSON.stringify(id.id) : id.id;
+                let innerId = id.id;
+                if (typeof innerId === 'object' && innerId !== null && 'String' in innerId) {
+                    innerId = innerId.String;
+                } else if (typeof innerId === 'object') {
+                    innerId = JSON.stringify(innerId);
+                }
                 return `${id.tb}:${innerId}`;
             }
             // Fallback for other objects
@@ -96,7 +101,12 @@ export const CanvasBoard = () => {
             // TODO: Use actual canvas ID. For now hardcoded or passed from somewhere? 
             // The prompt didn't specify multiple canvases, so "main" or similar is fine.
             const canvasId = "canvas:main";
-            const newNodes = await GraphAPI.invokeChat(canvasId, text);
+            const newNodes = await GraphAPI.invokeChat(
+                canvasId,
+                text,
+                tempPos ? tempPos.x : 0,
+                tempPos ? tempPos.y : 0
+            );
 
             // Transform backend nodes to ReactFlow nodes
             const rfNodes = newNodes.map(transformBackendNode);

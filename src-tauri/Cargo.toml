@@ -25,6 +25,8 @@ tauri = { version = "2.9.5", features = [] }
 tauri-plugin-log = "2"
 surrealdb = { version = "2", features = ["kv-rocksdb", "kv-mem"] }
 tokio = { version = "1.41.1", features = ["sync", "rt-multi-thread"] }
+env_logger = "0.11.8"
+anyhow = "1.0.100"
 
 [profile.release]
 lto = true

@@ -6,29 +6,29 @@ pub enum DbEvent {
     AddNode {
         canvas_id: Thing,
         node: Node,
-        response: oneshot::Sender<Result<Node, surrealdb::Error>>,
+        response: oneshot::Sender<anyhow::Result<Node>>,
     },
     AddDerivedNode {
         canvas_id: Thing,
         from: Thing,
         to: Node,
-        response: oneshot::Sender<Result<Node, surrealdb::Error>>,
+        response: oneshot::Sender<anyhow::Result<Node>>,
     },
     AddSequencedNode {
         canvas_id: Thing,
         from: Thing,
         to: Node,
-        response: oneshot::Sender<Result<Node, surrealdb::Error>>,
+        response: oneshot::Sender<anyhow::Result<Node>>,
     },
     MoveNode {
         node_id: Thing,
         x: f64,
         y: f64,
-        response: Option<oneshot::Sender<Result<Node, surrealdb::Error>>>,
+        response: Option<oneshot::Sender<anyhow::Result<Node>>>,
     },
     DeleteNode {
         node_id: Thing,
-        response: oneshot::Sender<Result<(), surrealdb::Error>>,
+        response: oneshot::Sender<anyhow::Result<()>>,
     },
 }
 

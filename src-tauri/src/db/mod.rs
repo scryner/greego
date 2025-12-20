@@ -30,10 +30,7 @@ pub enum DatabaseConfig {
 }
 
 impl Database {
-    pub async fn init(
-        app_handle: AppHandle,
-        config: DatabaseConfig,
-    ) -> Result<Arc<Self>, surrealdb::Error> {
+    pub async fn init(app_handle: AppHandle, config: DatabaseConfig) -> anyhow::Result<Arc<Self>> {
         let client = match config {
             DatabaseConfig::InMemory => {
                 let client = Surreal::new::<Mem>(()).await?;
@@ -90,11 +87,11 @@ impl Database {
     pub async fn load_canvas(
         &self,
         canvas_id: Thing,
-    ) -> Result<(Vec<Node>, Vec<Derives>, Vec<Sequences>), surrealdb::Error> {
+    ) -> anyhow::Result<(Vec<Node>, Vec<Derives>, Vec<Sequences>)> {
         operation::load_canvas(&self.client, canvas_id).await
     }
 
-    pub async fn add_node(&self, canvas_id: Thing, node: Node) -> Result<Node, surrealdb::Error> {
+    pub async fn add_node(&self, canvas_id: Thing, node: Node) -> anyhow::Result<Node> {
         let (tx, rx) = oneshot::channel();
         let event = DbEvent::AddNode {
             canvas_id,
@@ -110,7 +107,7 @@ impl Database {
         canvas_id: Thing,
         from: Thing,
         to: Node,
-    ) -> Result<Node, surrealdb::Error> {
+    ) -> anyhow::Result<Node> {
         let (tx, rx) = oneshot::channel();
         let event = DbEvent::AddDerivedNode {
             canvas_id,
@@ -127,7 +124,7 @@ impl Database {
         canvas_id: Thing,
         from: Thing,
         to: Node,
-    ) -> Result<Node, surrealdb::Error> {
+    ) -> anyhow::Result<Node> {
         let (tx, rx) = oneshot::channel();
         let event = DbEvent::AddSequencedNode {
             canvas_id,
@@ -139,12 +136,7 @@ impl Database {
         rx.await.expect("Response dropped")
     }
 
-    pub async fn move_node_position(
-        &self,
-        node_id: Thing,
-        x: f64,
-        y: f64,
-    ) -> Result<Node, surrealdb::Error> {
+    pub async fn move_node_position(&self, node_id: Thing, x: f64, y: f64) -> anyhow::Result<Node> {
         let (tx, rx) = oneshot::channel();
         let event = DbEvent::MoveNode {
             node_id,
@@ -165,7 +157,7 @@ impl Database {
         }
     }
 
-    pub async fn delete_node(&self, node_id: Thing) -> Result<(), surrealdb::Error> {
+    pub async fn delete_node(&self, node_id: Thing) -> anyhow::Result<()> {
         let (tx, rx) = oneshot::channel();
         let event = DbEvent::DeleteNode {
             node_id,

@@ -58,6 +58,11 @@ impl EventLoop {
 
     async fn handle_incoming_event(&mut self, event: DbEvent) {
         let priority = event.priority();
+        log::debug!(
+            "handle_incoming_event: received event priority={:?}, queue_len={}",
+            priority,
+            self.queue.len()
+        );
 
         if self.queue.len() >= self.max_queue_len {
             self.process_queue().await;
@@ -76,8 +81,11 @@ impl EventLoop {
         }
 
         self.optimize_queue();
+        let queue_len_before = self.queue.len();
+        log::debug!("process_queue: queue_len_before={}", queue_len_before);
 
         let count = self.queue.len().min(self.batch_size);
+
         for _ in 0..count {
             if let Some(event) = self.queue.pop_front() {
                 self.execute_event(event).await;
@@ -88,11 +96,13 @@ impl EventLoop {
     fn optimize_queue(&mut self) {
         let mut seen_moves = std::collections::HashSet::new();
         let mut indices_to_remove = Vec::new();
+        let mut removed_count = 0;
 
         for i in (0..self.queue.len()).rev() {
             if let Some(DbEvent::MoveNode { node_id, .. }) = self.queue.get(i) {
                 if seen_moves.contains(node_id) {
                     indices_to_remove.push(i);
+                    removed_count += 1;
                 } else {
                     seen_moves.insert(node_id.clone());
                 }
@@ -102,15 +112,22 @@ impl EventLoop {
         for i in indices_to_remove {
             self.queue.remove(i);
         }
+        if removed_count > 0 {
+            log::debug!(
+                "optimize_queue: removed {} redundant move events",
+                removed_count
+            );
+        }
     }
 
-    async fn report_error_if_any<T>(&self, result: &Result<T, surrealdb::Error>) {
+    async fn report_error_if_any<T>(&self, result: &anyhow::Result<T>) {
         if let Err(e) = result {
             let _ = self.error_sender.send(e.to_string()).await;
         }
     }
 
     async fn execute_event(&self, event: DbEvent) {
+        log::debug!("execute_event: processing event");
         match event {
             DbEvent::AddNode {
                 canvas_id,
