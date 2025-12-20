@@ -31,6 +31,10 @@ const initialNodes: AppNodeType[] = [];
 
 const initialEdges: Edge[] = [];
 
+// Module-level cache to prevent double-fetching in Strict Mode
+// while ensuring the valid component instance receives the data.
+let loadGraphPromise: ReturnType<typeof GraphAPI.loadGraph> | null = null;
+
 export const CanvasBoard = () => {
     const [nodes, setNodes, onNodesChange] = useNodesState<AppNodeType>(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -264,7 +268,20 @@ export const CanvasBoard = () => {
         const loadGraph = async () => {
             try {
                 // TODO: Dynamic canvas ID
-                const [backendNodes, backendEdges] = await GraphAPI.loadGraph("canvas:main");
+                // Use cached promise if available to prevent double-fetching in Strict Mode
+                if (!loadGraphPromise) {
+                    loadGraphPromise = GraphAPI.loadGraph("canvas:main")
+                        .finally(() => {
+                            // Clear promise after network completion (but keep result propagation)
+                            // We clear it to ensure future full-refreshes (e.g. navigation) get fresh data
+                            // The timeout ensures all concurrent effects pick up this promise before it's cleared
+                            setTimeout(() => {
+                                loadGraphPromise = null;
+                            }, 500);
+                        });
+                }
+
+                const [backendNodes, backendEdges] = await loadGraphPromise;
 
                 if (ignore) return;
 
