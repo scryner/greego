@@ -139,13 +139,188 @@ impl LlmService for AnthropicService {
 
     async fn chat_stream(
         &self,
-        _input: LlmInput,
+        input: LlmInput,
     ) -> anyhow::Result<
         std::pin::Pin<
             Box<dyn futures::Stream<Item = anyhow::Result<crate::llm::LlmStreamChunk>> + Send>,
         >,
     > {
-        Err(anyhow::anyhow!("Anthropic stream not implemented yet"))
+        let mut messages = Vec::new();
+
+        for msg in input.history {
+            messages.push(convert_message(msg));
+        }
+        messages.push(convert_message(input.user_input));
+
+        let system = input.system_prompt;
+        let max_tokens = 4096;
+
+        let mut request_body = serde_json::to_value(CreateMessageRequest {
+            model: self.model.clone(),
+            messages,
+            system,
+            max_tokens,
+        })?;
+
+        // Add stream: true
+        if let Some(obj) = request_body.as_object_mut() {
+            obj.insert("stream".to_string(), serde_json::Value::Bool(true));
+        }
+
+        let url = "https://api.anthropic.com/v1/messages";
+
+        let response = self
+            .client
+            .post(url)
+            .header("x-api-key", &self.api_key)
+            .header("anthropic-version", "2023-06-01")
+            .header("content-type", "application/json")
+            .json(&request_body)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return Err(anyhow::anyhow!(
+                "Anthropic API Error: {} - {}",
+                status,
+                text
+            ));
+        }
+
+        let stream = response.bytes_stream();
+        let stream = futures::StreamExt::map(stream, |chunk_result| {
+            chunk_result.map_err(|e| anyhow::anyhow!("Stream error: {}", e))
+        });
+
+        // SSE Parser for Anthropic
+        let stream = async_stream::try_stream! {
+            let mut buffer = String::new();
+
+            for await chunk in stream {
+                let bytes = chunk?;
+                let text = String::from_utf8_lossy(&bytes);
+                buffer.push_str(&text);
+
+                while let Some(line_end) = buffer.find('\n') {
+                    let line = buffer[..line_end].trim();
+                    let line_content = line.to_string();
+                    buffer = buffer[line_end + 1..].to_string();
+
+                    if line_content.is_empty() {
+                        continue;
+                    }
+
+                    if line_content.starts_with("data: ") {
+                         let data = &line_content["data: ".len()..];
+
+                         if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
+                             if let Some(event_type) = json.get("type").and_then(|t| t.as_str()) {
+                                 match event_type {
+                                     "content_block_delta" => {
+                                         if let Some(delta) = json.get("delta") {
+                                             if let Some(text) = delta.get("text").and_then(|t| t.as_str()) {
+                                                 yield crate::llm::LlmStreamChunk {
+                                                     content: text.to_string(),
+                                                     usage: None,
+                                                 };
+                                             }
+                                         }
+                                     }
+                                     "message_stop" => {
+                                         // Stream done
+                                     }
+                                     _ => {}
+                                 }
+                             }
+                         }
+                    }
+                }
+            }
+        };
+
+        Ok(Box::pin(stream))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+
+    fn get_api_key() -> String {
+        env::var("ANTHROPIC_API_KEY").expect("ANTHROPIC_API_KEY must be set")
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_anthropic_completion() {
+        let api_key = get_api_key();
+        let service = AnthropicService::new(
+            api_key,
+            "claude-haiku-4-5".to_string(),
+            Duration::from_secs(30),
+        );
+
+        let input = LlmInput {
+            system_prompt: Some("You are a helpful assistant.".to_string()),
+            history: vec![],
+            user_input: Message::new_text(Role::User, "Hello, tell me a short joke."),
+        };
+
+        let result = service.chat_completion(input).await;
+
+        match result {
+            Ok(output) => {
+                println!("Success! Output: {:?}", output);
+                assert!(!output.content.is_empty(), "Content should not be empty");
+            }
+            Err(e) => panic!("Failed to get completion: {}", e),
+        }
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_anthropic_stream() {
+        use futures::StreamExt;
+
+        let api_key = get_api_key();
+        let service = AnthropicService::new(
+            api_key,
+            "claude-haiku-4-5".to_string(),
+            Duration::from_secs(30),
+        );
+
+        let input = LlmInput {
+            system_prompt: Some("You are a helpful assistant.".to_string()),
+            history: vec![],
+            user_input: Message::new_text(Role::User, "Hello, tell me a short joke."),
+        };
+
+        let result = service.chat_stream(input).await;
+
+        match result {
+            Ok(mut stream) => {
+                println!("Success! Stream started.");
+                let mut full_text = String::new();
+                while let Some(chunk_res) = stream.next().await {
+                    match chunk_res {
+                        Ok(chunk) => {
+                            print!("{}", chunk.content);
+                            full_text.push_str(&chunk.content);
+                        }
+                        Err(e) => println!("Chunk error: {}", e),
+                    }
+                }
+                println!("\nStream finished. Full text: {}", full_text);
+                assert!(
+                    !full_text.is_empty(),
+                    "Streamed content should not be empty"
+                );
+            }
+            Err(e) => panic!("Failed to get stream: {}", e),
+        }
     }
 }
 
