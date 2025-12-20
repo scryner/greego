@@ -3,6 +3,7 @@ pub mod db;
 
 use db::Database;
 use tauri::Manager;
+use tauri_plugin_log::fern::colors::ColoredLevelConfig;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -11,6 +12,7 @@ pub fn run() {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
+                        .with_colors(ColoredLevelConfig::default())
                         .level(log::LevelFilter::Debug)
                         .build(),
                 )?;
