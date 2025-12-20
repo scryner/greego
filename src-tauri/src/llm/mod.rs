@@ -1,4 +1,7 @@
+pub mod anthropic;
 pub mod config;
+pub mod google;
+pub mod openai;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
