@@ -168,3 +168,36 @@ fn convert_message(msg: Message) -> OpenAiMessage {
 
     OpenAiMessage { role, content }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_lmstudio_completion() {
+        let service = OpenAiCompatibleService::new(
+            "http://192.168.0.130:1234/v1".to_string(),
+            Some("lm-studio".to_string()),
+            "gpt-oss-120b".to_string(),
+            Duration::from_secs(60),
+        );
+
+        let input = LlmInput {
+            system_prompt: Some("You are a helpful assistant.".to_string()),
+            history: vec![],
+            user_input: Message::new_text(Role::User, "Hello, who are you?"),
+        };
+
+        let result = service.chat_completion(input).await;
+
+        match result {
+            Ok(output) => {
+                println!("Success! Output: {:?}", output);
+                assert!(!output.content.is_empty(), "Content should not be empty");
+            }
+            Err(e) => panic!("Failed to get completion: {}", e),
+        }
+    }
+}
