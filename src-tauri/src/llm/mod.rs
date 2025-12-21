@@ -5,6 +5,9 @@ pub mod lmstudio;
 pub mod openai;
 pub mod openai_compatible;
 
+#[cfg(feature = "apple")]
+pub mod apple;
+
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
