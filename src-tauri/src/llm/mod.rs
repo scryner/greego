@@ -14,8 +14,8 @@ pub use provider::{
 pub use provider::apple;
 
 pub struct LlmModel {
-    model: String,
-    service: Box<dyn LlmService>,
+    pub model: String,
+    pub service: Box<dyn LlmService>,
 }
 
 pub struct LlmServiceManager {

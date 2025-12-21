@@ -3,11 +3,13 @@ pub mod db;
 pub mod llm;
 
 use db::Database;
-use llm::{openai_compatible::OpenAiCompatibleService, LlmService};
+// use llm::{openai_compatible::OpenAiCompatibleService, LlmService}; // Removed
+use llm::LlmServiceManager; // Added
 use std::sync::Arc;
-use std::time::Duration;
+// use std::time::Duration; // Removed unused
 use tauri::Manager;
 use tauri_plugin_log::fern::colors::ColoredLevelConfig;
+use tokio::sync::RwLock; // Added
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -37,15 +39,10 @@ pub fn run() {
             // Manage the Database (cloning the struct which holds the Arc)
             app.manage((*db_arc).clone());
 
-            // Initialize LLM Service
-            // TODO: Load from config
-            let llm_service = OpenAiCompatibleService::new(
-                "http://192.168.0.130:1234/v1".to_string(), // Default for dev?
-                Some("lm-studio".to_string()),
-                Duration::from_secs(60),
-            );
-            let llm_service_arc: Arc<dyn LlmService + Send + Sync> = Arc::new(llm_service);
-            app.manage(llm_service_arc);
+            // Initialize LLM Service Manager
+            let llm_manager = LlmServiceManager::new();
+            let llm_manager_arc = Arc::new(RwLock::new(llm_manager));
+            app.manage(llm_manager_arc);
 
             Ok(())
         })
@@ -56,7 +53,8 @@ pub fn run() {
             commands::move_node_position_command,
             commands::delete_node_command,
             commands::load_canvas_command,
-            commands::invoke_chat_command
+            commands::invoke_chat_command,
+            commands::llm::add_llm_service, // Added
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
