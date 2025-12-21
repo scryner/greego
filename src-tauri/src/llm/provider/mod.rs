@@ -2,6 +2,7 @@ pub mod anthropic;
 pub mod config;
 pub mod google;
 pub mod lmstudio;
+pub mod ollama;
 pub mod openai;
 pub mod openai_compatible;
 

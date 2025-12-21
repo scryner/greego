@@ -111,6 +111,92 @@ const LMStudioConfig: React.FC<{ onDelete: () => void }> = ({ onDelete }) => {
             </div>
         </div>
     );
+
+}
+
+const OllamaConfig: React.FC<{ onDelete: () => void }> = ({ onDelete }) => {
+    const [baseUrl, setBaseUrl] = useState("http://localhost:11434/v1");
+    const [isConfigured, setIsConfigured] = useState(false);
+
+    const handleDone = async () => {
+        try {
+            await invoke('add_llm_service', {
+                providerName: 'ollama',
+                providerConf: {
+                    base_url: baseUrl
+                }
+            });
+            setIsConfigured(true);
+        } catch (error) {
+            console.error("Failed to add Ollama service:", error);
+        }
+    };
+
+    if (isConfigured) {
+        return (
+            <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-4 flex items-center justify-between hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center">
+                        <span className="material-icons-round text-slate-700 dark:text-slate-300">smart_toy</span>
+                    </div>
+                    <div>
+                        <h4 className="font-bold text-slate-800 dark:text-slate-200">Ollama</h4>
+                        <p className="text-xs text-slate-500">Local LLM</p>
+                    </div>
+                </div>
+                <button
+                    onClick={() => setIsConfigured(false)}
+                    className="px-4 py-1.5 rounded-full bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm shadow-primary/30"
+                >
+                    Configure
+                </button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-6 border border-primary/20 shadow-sm animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center">
+                        <span className="material-icons-round text-slate-700 dark:text-slate-300">smart_toy</span>
+                    </div>
+                    <div>
+                        <h4 className="font-bold text-slate-800 dark:text-slate-200">Ollama</h4>
+                        <p className="text-xs text-slate-500">Local LLM</p>
+                    </div>
+                </div>
+                <button
+                    onClick={handleDone}
+                    className="px-4 py-1.5 rounded-full bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm shadow-primary/30"
+                >
+                    Done
+                </button>
+            </div>
+
+            <div className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Base URL</label>
+                    <input
+                        type="text"
+                        value={baseUrl}
+                        onChange={(e) => setBaseUrl(e.target.value)}
+                        className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/50 text-slate-700 dark:text-slate-200"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1 italic">Include /v1 if using OpenAI compatibility</p>
+                </div>
+            </div>
+
+            <div className="flex justify-end mt-6">
+                <button
+                    onClick={onDelete}
+                    className="px-4 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm font-medium hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
+                >
+                    Delete
+                </button>
+            </div>
+        </div>
+    );
 }
 
 const OpenAIConfig: React.FC<{ onDelete: () => void }> = ({ onDelete }) => {
@@ -471,6 +557,18 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({ onClose }) => {
                                     onDelete={async () => {
                                         try {
                                             await invoke('delete_llm_service', { providerName: 'google' });
+                                            removeService(service.id);
+                                        } catch (error) {
+                                            console.error("Failed to delete service:", error);
+                                        }
+                                    }}
+                                />
+                            ) : service.id === 'ollama' ? (
+                                <OllamaConfig
+                                    key={service.id}
+                                    onDelete={async () => {
+                                        try {
+                                            await invoke('delete_llm_service', { providerName: 'ollama' });
                                             removeService(service.id);
                                         } catch (error) {
                                             console.error("Failed to delete service:", error);

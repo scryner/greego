@@ -2,9 +2,12 @@ use crate::llm::{
     provider::{
         anthropic::AnthropicService,
         apple::AppleService,
-        config::{AnthropicConfig, CustomConfig, GoogleConfig, LMStudioConfig, OpenAIConfig},
+        config::{
+            AnthropicConfig, CustomConfig, GoogleConfig, LMStudioConfig, OllamaConfig, OpenAIConfig,
+        },
         google::GoogleService,
         lmstudio::LMStudioService,
+        ollama::OllamaService,
         openai::OpenAiService,
         openai_compatible::OpenAiCompatibleService,
     },
@@ -57,6 +60,12 @@ pub async fn add_llm_service(
                 .map_err(|e| format!("Invalid config for OpenAI: {}", e))?;
             let service = OpenAiService::new(config.api_key.clone(), timeout);
             manager.add_service("openai".to_string(), Box::new(service));
+        }
+        "ollama" => {
+            let config: OllamaConfig = serde_json::from_value(provider_conf)
+                .map_err(|e| format!("Invalid config for Ollama: {}", e))?;
+            let service = OllamaService::new(config.base_url, timeout);
+            manager.add_service("ollama".to_string(), Box::new(service));
         }
         "custom" => {
             let config: CustomConfig = serde_json::from_value(provider_conf)
