@@ -270,7 +270,17 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({ onClose }) => {
                     <div className="space-y-4 mb-12">
                         {activeServices.map(service => (
                             service.id === 'lmstudio' ? (
-                                <LMStudioConfig key={service.id} onDelete={() => removeService(service.id)} />
+                                <LMStudioConfig
+                                    key={service.id}
+                                    onDelete={async () => {
+                                        try {
+                                            await invoke('delete_llm_service', { providerName: service.id });
+                                            removeService(service.id);
+                                        } catch (error) {
+                                            console.error("Failed to delete service:", error);
+                                        }
+                                    }}
+                                />
                             ) : (
                                 <ServiceItem key={service.id} config={service} />
                             )
