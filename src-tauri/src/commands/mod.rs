@@ -219,7 +219,7 @@ pub async fn invoke_chat_command(
         // If we iterate stream inside this block, it is fine!
         // We just need to make sure we keep the guard until stream is done.
 
-        match manager_guard.chat_stream(&model, input).await {
+        match manager_guard.chat_stream(&model, &model, input).await {
             Ok(mut stream) => {
                 let mut full_text = String::new();
                 while let Some(chunk_res) = stream.next().await {

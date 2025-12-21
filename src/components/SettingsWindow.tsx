@@ -52,22 +52,7 @@ const LMStudioConfig: React.FC<{ onDelete: () => void }> = ({ onDelete }) => {
                     <p className="text-[10px] text-slate-400 mt-1 italic">Optional</p>
                 </div>
 
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Model Name</label>
-                    <div className="flex gap-2">
-                        <div className="relative flex-1">
-                            <select className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/50 text-slate-700 dark:text-slate-200 appearance-none">
-                                <option>Select a model</option>
-                            </select>
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-                                <span className="material-icons-round text-sm">expand_more</span>
-                            </span>
-                        </div>
-                        <button className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 transition-colors">
-                            <span className="material-icons-round">refresh</span>
-                        </button>
-                    </div>
-                </div>
+
             </div>
 
             <div className="flex justify-end mt-6">
