@@ -44,6 +44,15 @@ const LMStudioConfig: React.FC<{ onDelete: () => void }> = ({ onDelete }) => {
                 </div>
 
                 <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">API Key</label>
+                    <input
+                        type="text"
+                        className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/50 text-slate-700 dark:text-slate-200"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1 italic">Optional</p>
+                </div>
+
+                <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Model Name</label>
                     <div className="flex gap-2">
                         <div className="relative flex-1">

@@ -24,6 +24,11 @@ pub async fn add_llm_service(
     let mut manager = state.write().await;
     let timeout = Duration::from_secs(60); // Default timeout
 
+    let model_id = provider_conf
+        .get("model")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
     match provider_name.as_str() {
         "apple" => {
             // Apple service might not check config? Or assume default?
@@ -41,61 +46,66 @@ pub async fn add_llm_service(
             );
         }
         "anthropic" => {
+            let model_id = model_id.ok_or_else(|| "Missing model in config".to_string())?;
             let config: AnthropicConfig = serde_json::from_value(provider_conf)
                 .map_err(|e| format!("Invalid config for Anthropic: {}", e))?;
             let service = AnthropicService::new(config.api_key.clone(), timeout);
             manager.add_model(
-                config.model.clone(),
+                model_id.clone(),
                 LlmModel {
-                    model: config.model,
+                    model: model_id,
                     service: Box::new(service),
                 },
             );
         }
         "google" => {
+            let model_id = model_id.ok_or_else(|| "Missing model in config".to_string())?;
             let config: GoogleConfig = serde_json::from_value(provider_conf)
                 .map_err(|e| format!("Invalid config for Google: {}", e))?;
             let service = GoogleService::new(config.api_key.clone(), timeout);
             manager.add_model(
-                config.model.clone(),
+                model_id.clone(),
                 LlmModel {
-                    model: config.model,
+                    model: model_id,
                     service: Box::new(service),
                 },
             );
         }
         "lmstudio" => {
+            let model_id = model_id.ok_or_else(|| "Missing model in config".to_string())?;
             let config: LMStudioConfig = serde_json::from_value(provider_conf)
                 .map_err(|e| format!("Invalid config for LMStudio: {}", e))?;
-            let service = LMStudioService::new(config.base_url, None, timeout);
+            let service = LMStudioService::new(config.base_url, config.api_key, timeout);
             manager.add_model(
-                config.model.clone(),
+                model_id.clone(),
                 LlmModel {
-                    model: config.model,
+                    model: model_id,
                     service: Box::new(service),
                 },
             );
         }
         "openai" => {
+            let model_id = model_id.ok_or_else(|| "Missing model in config".to_string())?;
             let config: OpenAIConfig = serde_json::from_value(provider_conf)
                 .map_err(|e| format!("Invalid config for OpenAI: {}", e))?;
             let service = OpenAiService::new(config.api_key.clone(), timeout);
             manager.add_model(
-                config.model.clone(),
+                model_id.clone(),
                 LlmModel {
-                    model: config.model,
+                    model: model_id,
                     service: Box::new(service),
                 },
             );
         }
         "custom" => {
+            let model_id = model_id.ok_or_else(|| "Missing model in config".to_string())?;
             let config: CustomConfig = serde_json::from_value(provider_conf)
                 .map_err(|e| format!("Invalid config for Custom: {}", e))?;
             let service = OpenAiCompatibleService::new(config.base_url, config.api_key, timeout);
             manager.add_model(
-                config.model.clone(), // Use model name from config as key?
+                config.name.clone(),
                 LlmModel {
-                    model: config.model, // The actual model ID sent to API
+                    model: model_id,
                     service: Box::new(service),
                 },
             );
