@@ -3,13 +3,18 @@
 export const Sidebar = () => {
     return (
         <aside className="w-80 flex flex-col border-r border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark shadow-sm z-20 flex-shrink-0">
-            <div className="h-16 px-4 flex items-center justify-between border-b border-border-light dark:border-border-dark">
+            <div className="h-12 px-4 flex items-center justify-between border-b border-border-light dark:border-border-dark">
                 <button className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors">
                     <span className="material-icons-round">menu</span>
                 </button>
-                <h1 className="text-lg font-semibold text-slate-800 dark:text-white">Subject</h1>
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary hover:ring-offset-1 dark:ring-offset-slate-900 transition-all">
-                    <span className="material-icons-round text-sm">person</span>
+                <h1 className="text-base font-semibold text-slate-800 dark:text-white">Subject</h1>
+                <div className="flex items-center gap-2">
+                    <button className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 dark:text-slate-500 transition-colors">
+                        <span className="material-icons-round text-xl">settings</span>
+                    </button>
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary hover:ring-offset-1 dark:ring-offset-slate-900 transition-all">
+                        <span className="material-icons-round text-sm">person</span>
+                    </div>
                 </div>
             </div>
 

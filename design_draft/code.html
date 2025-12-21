@@ -2,34 +2,38 @@
 <html lang="en"><head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>Greego - Unified RAG Query Window</title>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<title>LLM Service Configuration - Greego</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
 <script>
         tailwind.config = {
             darkMode: "class",
             theme: {
                 extend: {
                     colors: {
-                        primary: "#6366f1", // Indigo 500
-                        "background-light": "#f1f5f9", // Slate 100
-                        "background-dark": "#0f172a", // Slate 900
-                        "surface-light": "#ffffff",
-                        "surface-dark": "#1e293b", // Slate 800
-                        "border-light": "#e2e8f0",
-                        "border-dark": "#334155",
-                        "text-secondary-light": "#64748b",
-                        "text-secondary-dark": "#94a3b8",
+                        primary: "#5A67D8", // Indigo-ish primary color from screenshots
+                        "background-light": "#F9FAFB", // Light gray background
+                        "background-dark": "#111827", // Dark gray background
+                        "card-light": "#FFFFFF",
+                        "card-dark": "#1F2937",
+                        "border-light": "#E5E7EB",
+                        "border-dark": "#374151",
+                        "text-light": "#111827",
+                        "text-dark": "#F3F4F6",
+                        "text-secondary-light": "#6B7280",
+                        "text-secondary-dark": "#9CA3AF",
+                        "danger-light": "#FEE2E2",
+                        "danger-text-light": "#B91C1C",
+                        "danger-dark": "#7F1D1D",
+                        "danger-text-dark": "#FECACA",
                     },
                     fontFamily: {
                         display: ["Inter", "sans-serif"],
+                        body: ["Inter", "sans-serif"],
                     },
                     borderRadius: {
-                        DEFAULT: "0.5rem",
-                        'xl': "1rem",
-                        '2xl': "1.5rem",
+                        DEFAULT: "0.75rem", // Rounded-xl feel
                     },
                 },
             },
@@ -38,188 +42,211 @@
 <style>
         body {
             font-family: 'Inter', sans-serif;
-        }.custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
+        }.toggle-checkbox:checked {
+            right: 0;
+            border-color: #5A67D8;
         }
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background-color: #cbd5e1;
-            border-radius: 20px;
-        }
-        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
-            background-color: #475569;
-        }.bg-grid-pattern {
-            background-size: 20px 20px;
-            background-image: radial-gradient(circle, #cbd5e1 1px, transparent 1px);
-        }
-        .dark .bg-grid-pattern {
-            background-image: radial-gradient(circle, #334155 1px, transparent 1px);
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #5A67D8;
         }
     </style>
 </head>
-<body class="h-screen w-full flex overflow-hidden bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 transition-colors duration-200">
-<aside class="w-80 flex flex-col border-r border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark shadow-sm z-20 flex-shrink-0">
-<div class="h-16 px-4 flex items-center justify-between border-b border-border-light dark:border-border-dark">
-<button class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors">
-<span class="material-icons-round">menu</span>
-</button>
-<h1 class="text-lg font-semibold text-slate-800 dark:text-white">Subject</h1>
-<div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary hover:ring-offset-1 dark:ring-offset-slate-900 transition-all">
-<span class="material-icons-round text-sm">person</span>
-</div>
-</div>
-<div class="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col items-center justify-center text-center">
-<div class="max-w-[200px] space-y-4 opacity-50">
-<span class="material-icons-round text-4xl text-primary/40">smart_toy</span>
-<p class="text-lg font-medium text-slate-400 dark:text-slate-500">How can I help?</p>
-<p class="text-sm text-slate-400 dark:text-slate-500">Ask questions across all your interconnected nodes.</p>
-</div>
-</div>
-<div class="p-4 border-t border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark">
-<div class="relative group">
-<div class="absolute -top-10 left-0 right-0 flex justify-center pb-2 opacity-0 group-hover:opacity-100 transition-opacity">
-<span class="text-xs bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-1 rounded-full">Unified Query</span>
-</div>
-<div class="bg-slate-100 dark:bg-slate-900 rounded-lg p-3 border border-transparent focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all shadow-sm">
-<textarea class="w-full bg-transparent border-none p-0 text-sm focus:ring-0 resize-none h-12 placeholder-slate-400 dark:placeholder-slate-500 text-slate-800 dark:text-slate-200" placeholder="Ask anything..."></textarea>
-<div class="flex items-center justify-between mt-2">
-<button class="p-1.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors">
-<span class="material-icons-round text-lg">add</span>
-</button>
-<div class="flex items-center gap-2">
-<button class="p-1.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors">
-<span class="material-icons-round text-lg">tune</span>
-</button>
-<button class="p-1.5 rounded-full bg-primary text-white shadow-md hover:bg-indigo-700 transition-colors">
-<span class="material-icons-round text-lg">add</span>
+<body class="bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark min-h-screen p-6 md:p-12 transition-colors duration-200">
+<div class="max-w-4xl mx-auto space-y-8">
+<div class="flex justify-between items-center mb-6">
+<h1 class="text-2xl font-bold tracking-tight">LLM Service Configuration</h1>
+<button class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" onclick="document.documentElement.classList.toggle('dark')">
+<span class="material-icons-outlined text-gray-600 dark:text-gray-300">brightness_4</span>
 </button>
 </div>
+<div class="space-y-4">
+<h2 class="text-lg font-semibold text-text-secondary-light dark:text-text-secondary-dark mb-4">Active Models</h2>
+<div class="bg-card-light dark:bg-card-dark rounded border border-border-light dark:border-border-dark p-6 shadow-sm transition-colors">
+<div class="flex items-start justify-between mb-6">
+<div class="flex items-center space-x-4">
+<div class="w-10 h-10 rounded-lg flex items-center justify-center bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300">
+<svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.0462 6.0462 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0843 5.46-3.1511 1.665 3.1568c-.1187.02-.2375.04-.3612.04a4.472 4.472 0 0 1-4.0293-2.6177zm6.2481-5.5812-1.9925-3.7506 2.6415-1.5247a4.3843 4.3843 0 0 1 .4381 3.6616 4.4839 4.4839 0 0 1-1.0871 1.6137zM2.341 8.0581a4.4698 4.4698 0 0 1 .5466-1.9213 4.4626 4.4626 0 0 1 3.531-2.3521l-1.6603 3.1568-2.4173 1.1166zm15.2222-2.8707-5.466 3.1511-1.665-3.1568c.1188-.02.2375-.04.3612-.04a4.472 4.472 0 0 1 4.0341 2.6177L16.2737 4.5l1.2895.6874zm-2.52 5.0666-6.308-3.6366 2.8715-1.6579 6.308 3.6366-2.8715 1.6579zM6.92 12.052l6.308 3.6366-2.8715 1.6579-6.308-3.6366 2.8715-1.6579zm-.2135 6.4197-2.6415 1.5247a4.3843 4.3843 0 0 1-.4381-3.6616 4.4839 4.4839 0 0 1 1.0871-1.6137l1.9925 3.7506zm13.9922-5.6577-2.4173-1.1166 1.6603-3.1568a4.4698 4.4698 0 0 1 2.9855 4.2734zm-9.0173 4.5269 1.665 3.1568c-2.4842.2706-4.9082-.8715-6.1772-2.9355l1.646-3.3732 2.8662 3.1519z"></path></svg>
+</div>
+<div>
+<h3 class="font-bold text-lg">GPT-4o</h3>
+<p class="text-sm text-text-secondary-light dark:text-text-secondary-dark">Configured for chat</p>
 </div>
 </div>
-<div class="mt-2 flex items-center gap-2 text-slate-400 dark:text-slate-500 px-1">
-<span class="text-xs font-medium">lms/gpt-oss-120b</span>
+<button class="bg-primary hover:bg-opacity-90 text-white px-5 py-2 rounded-lg font-medium text-sm shadow-sm transition-all transform active:scale-95">
+                        Done
+                    </button>
+</div>
+<div class="space-y-6">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+<label class="font-medium text-text-light dark:text-text-dark md:col-span-1">API Key</label>
+<div class="md:col-span-2 relative">
+<input class="w-full bg-background-light dark:bg-background-dark border border-border-light dark:border-border-dark rounded-lg px-4 py-3 text-text-light dark:text-text-dark focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all font-mono text-sm" type="password" value="sk-proj-XXXXXXXXXXXXXXXXXXXXXXXX"/>
+<div class="text-right mt-2 text-xs text-text-secondary-light dark:text-text-secondary-dark">
+                                Create an <a class="text-primary hover:underline" href="#">OpenAI API Key</a>.
+                            </div>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+<label class="font-medium text-text-light dark:text-text-dark md:col-span-1">ChatGPT Model</label>
+<div class="md:col-span-2">
+<div class="relative">
+<select class="w-full appearance-none bg-background-light dark:bg-background-dark border border-border-light dark:border-border-dark rounded-lg px-4 py-3 text-text-light dark:text-text-dark focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all pr-10">
+<option selected="">GPT-4o</option>
+<option>GPT-4-Turbo</option>
+<option>GPT-3.5-Turbo</option>
+</select>
+<div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-text-secondary-light dark:text-text-secondary-dark">
+<span class="material-icons-outlined text-xl">expand_more</span>
 </div>
 </div>
 </div>
-</aside>
-<main class="flex-1 relative overflow-hidden bg-grid-pattern">
-<div class="absolute top-6 left-6 z-10">
-<button class="w-10 h-10 bg-surface-light dark:bg-surface-dark rounded-full shadow-lg border border-border-light dark:border-border-dark flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-primary transition-colors">
-<span class="material-icons-round text-2xl">add</span>
+</div>
+</div>
+<div class="flex justify-end mt-8 border-t border-border-light dark:border-border-dark pt-4">
+<button class="bg-danger-light dark:bg-danger-dark text-danger-text-light dark:text-danger-text-dark hover:bg-red-200 dark:hover:bg-red-900 px-5 py-2 rounded-lg font-medium text-sm transition-colors">
+                        Delete
+                    </button>
+</div>
+</div>
+<div class="bg-card-light dark:bg-card-dark rounded border border-border-light dark:border-border-dark p-6 shadow-sm transition-colors">
+<div class="flex items-start justify-between mb-6">
+<div class="flex items-center space-x-4">
+<div class="w-10 h-10 rounded-lg flex items-center justify-center bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400">
+<span class="material-icons-outlined">auto_awesome</span>
+</div>
+<div>
+<h3 class="font-bold text-lg">gemini-2.5-flash</h3>
+<p class="text-sm text-text-secondary-light dark:text-text-secondary-dark">Configure to use</p>
+</div>
+</div>
+<button class="bg-gray-500 hover:bg-gray-600 text-white px-5 py-2 rounded-lg font-medium text-sm shadow-sm transition-all transform active:scale-95">
+                        Done
+                    </button>
+</div>
+<div class="space-y-6">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+<label class="font-medium text-text-light dark:text-text-dark md:col-span-1">API Key</label>
+<div class="md:col-span-2">
+<input class="w-full bg-background-light dark:bg-background-dark border border-border-light dark:border-border-dark rounded-lg px-4 py-3 text-text-light dark:text-text-dark focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all font-mono text-sm" type="text" value="AlfsdFERFdsfSDf4dsFs2df3dSdfS-FewD4Sa6"/>
+<div class="text-right mt-2 text-xs text-text-secondary-light dark:text-text-secondary-dark">
+                                Create a <a class="text-primary hover:underline" href="#">Google API Key</a>.
+                            </div>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+<label class="font-medium text-text-light dark:text-text-dark md:col-span-1">Gemini Model</label>
+<div class="md:col-span-2">
+<div class="relative">
+<select class="w-full appearance-none bg-background-light dark:bg-background-dark border border-border-light dark:border-border-dark rounded-lg px-4 py-3 text-text-light dark:text-text-dark focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all pr-10">
+<option selected="">gemini-2.5-flash</option>
+<option>gemini-pro</option>
+<option>gemini-ultra</option>
+</select>
+<div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-text-secondary-light dark:text-text-secondary-dark">
+<span class="material-icons-outlined text-xl">expand_more</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="flex justify-end mt-8 border-t border-border-light dark:border-border-dark pt-4">
+<button class="bg-danger-light dark:bg-danger-dark text-danger-text-light dark:text-danger-text-dark hover:bg-red-200 dark:hover:bg-red-900 px-5 py-2 rounded-lg font-medium text-sm transition-colors">
+                        Delete
+                    </button>
+</div>
+</div>
+<div class="bg-card-light dark:bg-card-dark rounded border border-border-light dark:border-border-dark p-4 shadow-sm transition-colors flex items-center justify-between group hover:border-primary/50 dark:hover:border-primary/50">
+<div class="flex items-center space-x-4">
+<div class="w-10 h-10 rounded-lg flex items-center justify-center bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300">
+<span class="material-icons-outlined">dns</span>
+</div>
+<div>
+<h3 class="font-bold text-lg group-hover:text-primary transition-colors">openai/gpt-oss-120b</h3>
+<p class="text-sm text-text-secondary-light dark:text-text-secondary-dark">LMStudio</p>
+</div>
+</div>
+<button class="bg-primary hover:bg-opacity-90 text-white px-5 py-2 rounded-lg font-medium text-sm shadow-sm transition-all transform active:scale-95">
+                    Configure
+                </button>
+</div>
+</div>
+<div class="pt-8">
+<h2 class="text-lg font-bold mb-6 text-text-light dark:text-text-dark">Add another service</h2>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+<button class="flex items-center justify-between bg-background-light dark:bg-card-dark border border-border-light dark:border-border-dark hover:border-primary dark:hover:border-primary p-3 rounded-lg transition-all group">
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-sm">
+<span class="material-icons-outlined text-blue-500 text-lg">auto_awesome</span>
+</div>
+<span class="font-medium text-text-light dark:text-text-dark group-hover:text-primary transition-colors">Google</span>
+</div>
+<span class="material-icons-outlined text-gray-400 group-hover:text-primary">add</span>
+</button>
+<button class="flex items-center justify-between bg-indigo-50 dark:bg-indigo-900/20 border border-transparent hover:border-indigo-300 dark:hover:border-indigo-700 p-3 rounded-lg transition-all group">
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center shadow-sm">
+<span class="material-icons-outlined text-white text-lg">dns</span>
+</div>
+<span class="font-medium text-text-light dark:text-text-dark group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">LMStudio</span>
+</div>
+<span class="material-icons-outlined text-indigo-400 group-hover:text-indigo-600">add</span>
+</button>
+<button class="flex items-center justify-between bg-background-light dark:bg-card-dark border border-border-light dark:border-border-dark hover:border-primary dark:hover:border-primary p-3 rounded-lg transition-all group">
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-sm border border-gray-100 dark:border-gray-700">
+<span class="material-icons-outlined text-gray-800 dark:text-gray-200 text-lg">smart_toy</span>
+</div>
+<span class="font-medium text-text-light dark:text-text-dark group-hover:text-primary transition-colors">Ollama</span>
+</div>
+<span class="material-icons-outlined text-gray-400 group-hover:text-primary">add</span>
+</button>
+<button class="flex items-center justify-between bg-green-50 dark:bg-green-900/20 border border-transparent hover:border-green-300 dark:hover:border-green-700 p-3 rounded-lg transition-all group">
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center shadow-sm">
+<svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.0462 6.0462 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0843 5.46-3.1511 1.665 3.1568c-.1187.02-.2375.04-.3612.04a4.472 4.472 0 0 1-4.0293-2.6177zm6.2481-5.5812-1.9925-3.7506 2.6415-1.5247a4.3843 4.3843 0 0 1 .4381 3.6616 4.4839 4.4839 0 0 1-1.0871 1.6137zM2.341 8.0581a4.4698 4.4698 0 0 1 .5466-1.9213 4.4626 4.4626 0 0 1 3.531-2.3521l-1.6603 3.1568-2.4173 1.1166zm15.2222-2.8707-5.466 3.1511-1.665-3.1568c.1188-.02.2375-.04.3612-.04a4.472 4.472 0 0 1 4.0341 2.6177L16.2737 4.5l1.2895.6874zm-2.52 5.0666-6.308-3.6366 2.8715-1.6579 6.308 3.6366-2.8715 1.6579zM6.92 12.052l6.308 3.6366-2.8715 1.6579-6.308-3.6366 2.8715-1.6579zm-.2135 6.4197-2.6415 1.5247a4.3843 4.3843 0 0 1-.4381-3.6616 4.4839 4.4839 0 0 1 1.0871-1.6137l1.9925 3.7506zm13.9922-5.6577-2.4173-1.1166 1.6603-3.1568a4.4698 4.4698 0 0 1 2.9855 4.2734zm-9.0173 4.5269 1.665 3.1568c-2.4842.2706-4.9082-.8715-6.1772-2.9355l1.646-3.3732 2.8662 3.1519z"></path></svg>
+</div>
+<span class="font-medium text-text-light dark:text-text-dark group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">OpenAI</span>
+</div>
+<span class="material-icons-outlined text-green-400 group-hover:text-green-600">add</span>
+</button>
+<button class="flex items-center justify-between bg-background-light dark:bg-card-dark border border-border-light dark:border-border-dark hover:border-primary dark:hover:border-primary p-3 rounded-lg transition-all group">
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 rounded-full bg-slate-500 flex items-center justify-center shadow-sm">
+<span class="material-icons-outlined text-white text-lg">router</span>
+</div>
+<span class="font-medium text-text-light dark:text-text-dark group-hover:text-primary transition-colors">OpenRouter</span>
+</div>
+<span class="material-icons-outlined text-gray-400 group-hover:text-primary">add</span>
+</button>
+<button class="flex items-center justify-between bg-orange-50 dark:bg-orange-900/20 border border-transparent hover:border-orange-300 dark:hover:border-orange-700 p-3 rounded-lg transition-all group">
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 rounded-full bg-orange-800 flex items-center justify-center shadow-sm text-white font-bold text-xs font-serif">
+                            AI
+                        </div>
+<span class="font-medium text-text-light dark:text-text-dark group-hover:text-orange-700 dark:group-hover:text-orange-500 transition-colors">Anthropic</span>
+</div>
+<span class="material-icons-outlined text-orange-400 group-hover:text-orange-600">add</span>
+</button>
+<button class="flex items-center justify-between bg-sky-50 dark:bg-sky-900/20 border border-transparent hover:border-sky-300 dark:hover:border-sky-700 p-3 rounded-lg transition-all group">
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 rounded-full bg-sky-600 flex items-center justify-center shadow-sm">
+<span class="material-icons-outlined text-white text-lg">cloud</span>
+</div>
+<span class="font-medium text-text-light dark:text-text-dark group-hover:text-sky-700 dark:group-hover:text-sky-500 transition-colors">Azure</span>
+</div>
+<span class="material-icons-outlined text-sky-400 group-hover:text-sky-600">add</span>
+</button>
+<button class="flex items-center justify-between bg-gray-100 dark:bg-gray-800 border border-transparent hover:border-gray-300 dark:hover:border-gray-600 p-3 rounded-lg transition-all group">
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 rounded-full bg-black flex items-center justify-center shadow-sm text-white font-bold text-xs">
+                            X
+                        </div>
+<span class="font-medium text-text-light dark:text-text-dark group-hover:text-black dark:group-hover:text-white transition-colors">xAI</span>
+</div>
+<span class="material-icons-outlined text-gray-400 group-hover:text-gray-600">add</span>
 </button>
 </div>
-<div class="absolute inset-0 w-[2000px] h-[2000px] transform origin-top-left">
-<svg class="absolute inset-0 w-full h-full pointer-events-none z-0">
-<path class="dark:stroke-slate-600" d="M 400 143 C 460 143, 460 199, 520 199" fill="none" stroke="#cbd5e1" stroke-width="2"></path>
-<path class="dark:stroke-slate-600" d="M 776 199 C 808 199, 808 215, 840 215" fill="none" stroke="#cbd5e1" stroke-width="2"></path>
-<path class="dark:stroke-slate-600" d="M 240 245 L 240 320" fill="none" stroke="#cbd5e1" stroke-dasharray="6,4" stroke-width="2"></path>
-</svg>
-<div class="absolute top-10 left-20 w-80 bg-surface-light dark:bg-surface-dark rounded-xl shadow-lg border border-border-light dark:border-border-dark z-10 flex flex-col">
-<div class="p-3 border-b border-border-light dark:border-border-dark flex items-center justify-between">
-<span class="font-medium text-sm text-slate-700 dark:text-slate-200">hello</span>
-<span class="material-icons-round text-slate-400 text-sm">more_horiz</span>
-</div>
-<div class="p-4 h-40 overflow-y-auto">
-<p class="text-slate-600 dark:text-slate-300">hello, How are you?</p>
-</div>
-<div class="absolute top-1/2 -right-1.5 w-3 h-3 bg-slate-400 dark:bg-slate-500 rounded-full border-2 border-white dark:border-slate-800 transform -translate-y-1/2 cursor-pointer hover:scale-125 transition-transform"></div>
-<div class="absolute -bottom-1.5 left-1/2 w-3 h-3 bg-slate-400 dark:bg-slate-500 rounded-full border-2 border-white dark:border-slate-800 transform -translate-x-1/2 cursor-pointer hover:scale-125 transition-transform"></div>
-</div>
-<div class="absolute top-80 left-20 w-80 bg-surface-light dark:bg-surface-dark rounded-xl shadow-lg border border-border-light dark:border-border-dark z-10 flex flex-col">
-<div class="p-3 border-b border-border-light dark:border-border-dark flex items-center justify-between">
-<span class="font-medium text-sm text-slate-700 dark:text-slate-200">greeting</span>
-<span class="material-icons-round text-slate-400 text-sm">more_horiz</span>
-</div>
-<div class="p-4 h-32 flex flex-col justify-end">
-<div class="flex flex-col gap-3">
-<div class="relative w-full">
-<div class="absolute left-2 top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 bg-slate-500 rounded-full text-white">
-<span class="material-icons-round text-[14px]">add</span>
-</div>
-<input class="w-full text-sm pl-9 pr-4 py-2 rounded-full bg-slate-200/50 dark:bg-slate-800 border-none focus:ring-0 placeholder-slate-500 text-slate-700 dark:text-slate-200 transition-colors" placeholder="Ask anything..." type="text"/>
-</div>
-<div class="flex items-center gap-2 text-slate-400 dark:text-slate-500 px-1">
-<span class="text-xs font-medium">lms/gpt-oss-120b</span>
-<div class="flex-1"></div>
 </div>
 </div>
-</div>
-<div class="absolute -top-1.5 left-1/2 w-3 h-3 bg-slate-400 dark:bg-slate-500 rounded-full border-2 border-white dark:border-slate-800 transform -translate-x-1/2 cursor-pointer hover:scale-125 transition-transform"></div>
-</div>
-<div class="absolute top-20 left-[520px] w-64 bg-surface-light dark:bg-surface-dark rounded-xl shadow-lg border border-border-light dark:border-border-dark z-10 flex flex-col">
-<div class="p-3 border-b border-border-light dark:border-border-dark flex items-center justify-between bg-indigo-50 dark:bg-indigo-900/20 rounded-t-xl">
-<div class="flex items-center gap-2">
-<span class="material-icons-round text-indigo-500 text-sm">translate</span>
-<span class="font-medium text-sm text-indigo-700 dark:text-indigo-300">translating</span>
-</div>
-<span class="material-icons-round text-slate-400 text-sm">more_horiz</span>
-</div>
-<div class="p-4 h-48 overflow-y-auto">
-<div class="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Korean Output:</div>
-<p class="text-slate-800 dark:text-slate-200 leading-relaxed font-sans">
-                        한국어로는<br/>
-                        "안녕, 오늘 어때?"
-                    </p>
-</div>
-<div class="absolute top-1/2 -left-1.5 w-3 h-3 bg-slate-400 dark:bg-slate-500 rounded-full border-2 border-white dark:border-slate-800 transform -translate-y-1/2 cursor-pointer hover:scale-125 transition-transform"></div>
-<div class="absolute top-1/2 -right-1.5 w-3 h-3 bg-slate-400 dark:bg-slate-500 rounded-full border-2 border-white dark:border-slate-800 transform -translate-y-1/2 cursor-pointer hover:scale-125 transition-transform"></div>
-</div>
-<div class="absolute top-[167px] left-[840px] w-72 bg-surface-light dark:bg-surface-dark rounded-xl shadow-lg border border-border-light dark:border-border-dark z-10 flex flex-col">
-<div class="p-4">
-<div class="flex flex-col gap-3">
-<div class="relative w-full">
-<div class="absolute left-2 top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 bg-slate-500 rounded-full text-white">
-<span class="material-icons-round text-[14px]">add</span>
-</div>
-<input class="w-full text-sm pl-9 pr-4 py-2 rounded-full bg-slate-200/50 dark:bg-slate-800 border-none focus:ring-0 placeholder-slate-500 text-slate-700 dark:text-slate-200 transition-colors" placeholder="Ask anything..." type="text"/>
-</div>
-<div class="flex items-center gap-2 text-slate-400 dark:text-slate-500 px-1">
-<span class="text-xs font-medium">lms/gpt-oss-120b</span>
-<div class="flex-1"></div>
-</div>
-</div>
-</div>
-<div class="absolute top-1/2 -left-1.5 w-3 h-3 bg-slate-400 dark:bg-slate-500 rounded-full border-2 border-white dark:border-slate-800 transform -translate-y-1/2 cursor-pointer hover:scale-125 transition-transform"></div>
-</div>
-</div>
-<div class="absolute bottom-6 left-6 w-32 h-24 bg-surface-light dark:bg-surface-dark rounded-lg shadow-lg border border-border-light dark:border-border-dark overflow-hidden z-20">
-<div class="w-full h-full relative bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-sm">
-<svg class="absolute inset-0 w-full h-full pointer-events-none z-0 opacity-50">
-<path class="text-slate-400 dark:text-slate-500" d="M 40 18 C 47 18, 47 24, 54 24" fill="none" stroke="currentColor" stroke-width="1.5"></path>
-<path class="text-slate-400 dark:text-slate-500" d="M 78 24 C 82 24, 82 26, 86 26" fill="none" stroke="currentColor" stroke-width="1.5"></path>
-<path class="text-slate-400 dark:text-slate-500" d="M 24 28 L 24 38" fill="none" stroke="currentColor" stroke-dasharray="2,2" stroke-width="1.5"></path>
-</svg>
-<div class="absolute top-2 left-2 w-8 h-5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-[2px] shadow-sm flex flex-col overflow-hidden z-10">
-<div class="h-1 bg-slate-200 dark:bg-slate-700 w-full"></div>
-</div>
-<div class="absolute top-10 left-2 w-8 h-4 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-[2px] shadow-sm flex flex-col overflow-hidden z-10">
-<div class="h-1 bg-slate-200 dark:bg-slate-700 w-full"></div>
-</div>
-<div class="absolute top-3 left-[54px] w-6 h-6 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-[2px] shadow-sm flex flex-col overflow-hidden z-10">
-<div class="h-1 bg-indigo-200 dark:bg-indigo-800 w-full"></div>
-</div>
-<div class="absolute top-5 left-[86px] w-7 h-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-[2px] shadow-sm flex flex-col justify-center px-[2px] z-10">
-<div class="w-full h-1 bg-slate-100 dark:bg-slate-600 rounded-full"></div>
-</div>
-<div class="absolute top-0 left-0 w-24 h-16 border-2 border-primary rounded-sm pointer-events-none z-20 opacity-50 bg-primary/5"></div>
-</div>
-</div>
-<div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
-<div class="flex items-center gap-1 bg-surface-light dark:bg-surface-dark rounded-full shadow-lg border border-border-light dark:border-border-dark p-1.5">
-<button class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors">
-<span class="material-icons-round text-xl">remove</span>
-</button>
-<button class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors">
-<span class="material-icons-round text-xl">add</span>
-</button>
-<div class="w-px h-6 bg-border-light dark:bg-border-dark mx-1"></div>
-<button class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors" title="Fit to screen">
-<span class="material-icons-round text-xl">center_focus_strong</span>
-</button>
-</div>
-</div>
-</main>
 
 </body></html>
