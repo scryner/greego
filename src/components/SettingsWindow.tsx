@@ -371,6 +371,186 @@ const GoogleConfig: React.FC<{ onDelete: () => void }> = ({ onDelete }) => {
     );
 }
 
+
+
+
+
+const CustomConfig: React.FC<{ onDelete: () => void }> = ({ onDelete }) => {
+    const [name, setName] = useState("");
+    const [baseUrl, setBaseUrl] = useState("");
+    const [apiKey, setApiKey] = useState("");
+    const [model, setModel] = useState("");
+    const [isConfigured, setIsConfigured] = useState(false);
+    const [nameError, setNameError] = useState("");
+    const [baseUrlError, setBaseUrlError] = useState("");
+    const [modelError, setModelError] = useState("");
+
+    const handleDone = async () => {
+        let isValid = true;
+
+        if (!name.trim()) {
+            setNameError("Service Name is required");
+            isValid = false;
+        } else {
+            setNameError("");
+        }
+
+        if (!baseUrl.trim()) {
+            setBaseUrlError("Base URL is required");
+            isValid = false;
+        } else {
+            setBaseUrlError("");
+        }
+
+        if (!model.trim()) {
+            setModelError("Model ID is required");
+            isValid = false;
+        } else {
+            setModelError("");
+        }
+
+        if (!isValid) return;
+
+        try {
+            await invoke('add_llm_service', {
+                providerName: 'custom',
+                providerConf: {
+                    name,
+                    base_url: baseUrl,
+                    api_key: apiKey || null,
+                    model
+                }
+            });
+            setIsConfigured(true);
+        } catch (error) {
+            console.error("Failed to add Custom service:", error);
+        }
+    };
+
+    if (isConfigured) {
+        return (
+            <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-4 flex items-center justify-between hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center">
+                        <span className="material-icons-round text-slate-500">auto_fix_high</span>
+                    </div>
+                    <div>
+                        <h4 className="font-bold text-slate-800 dark:text-slate-200">{name}</h4>
+                        <p className="text-xs text-slate-500">Custom LLM ({model})</p>
+                    </div>
+                </div>
+                <button
+                    onClick={() => setIsConfigured(false)}
+                    className="px-4 py-1.5 rounded-full bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm shadow-primary/30"
+                >
+                    Configure
+                </button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-6 border border-primary/20 shadow-sm animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center">
+                        <span className="material-icons-round text-slate-500">auto_fix_high</span>
+                    </div>
+                    <div>
+                        <h4 className="font-bold text-slate-800 dark:text-slate-200">Custom Service</h4>
+                        <p className="text-xs text-slate-500">Configure your own provider</p>
+                    </div>
+                </div>
+                <button
+                    onClick={handleDone}
+                    className="px-4 py-1.5 rounded-full bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm shadow-primary/30"
+                >
+                    Done
+                </button>
+            </div>
+
+            <div className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Service Name</label>
+                    <input
+                        type="text"
+                        value={name}
+                        onChange={(e) => {
+                            setName(e.target.value);
+                            if (e.target.value.trim()) setNameError("");
+                        }}
+                        className={`w-full bg-white dark:bg-slate-800 border ${nameError ? 'border-red-500' : 'border-slate-200 dark:border-slate-700'} rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ${nameError ? 'focus:ring-red-500/50' : 'focus:ring-primary/50'} text-slate-700 dark:text-slate-200`}
+                        placeholder="e.g., My Local Server"
+                    />
+                    {nameError ? (
+                        <p className="text-red-500 text-xs mt-1">{nameError}</p>
+                    ) : (
+                        <p className="text-[10px] text-slate-400 mt-1 italic">Required</p>
+                    )}
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Base URL</label>
+                    <input
+                        type="text"
+                        value={baseUrl}
+                        onChange={(e) => {
+                            setBaseUrl(e.target.value);
+                            if (e.target.value.trim()) setBaseUrlError("");
+                        }}
+                        className={`w-full bg-white dark:bg-slate-800 border ${baseUrlError ? 'border-red-500' : 'border-slate-200 dark:border-slate-700'} rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ${baseUrlError ? 'focus:ring-red-500/50' : 'focus:ring-primary/50'} text-slate-700 dark:text-slate-200`}
+                        placeholder="e.g., http://localhost:1234/v1"
+                    />
+                    {baseUrlError ? (
+                        <p className="text-red-500 text-xs mt-1">{baseUrlError}</p>
+                    ) : (
+                        <p className="text-[10px] text-slate-400 mt-1 italic">Required</p>
+                    )}
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">API Key</label>
+                    <input
+                        type="text"
+                        value={apiKey}
+                        onChange={(e) => setApiKey(e.target.value)}
+                        className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/50 text-slate-700 dark:text-slate-200"
+                        placeholder="Optional"
+                    />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Model ID</label>
+                    <input
+                        type="text"
+                        value={model}
+                        onChange={(e) => {
+                            setModel(e.target.value);
+                            if (e.target.value.trim()) setModelError("");
+                        }}
+                        className={`w-full bg-white dark:bg-slate-800 border ${modelError ? 'border-red-500' : 'border-slate-200 dark:border-slate-700'} rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ${modelError ? 'focus:ring-red-500/50' : 'focus:ring-primary/50'} text-slate-700 dark:text-slate-200`}
+                        placeholder="e.g., gpt-4, llama-2-7b"
+                    />
+                    {modelError ? (
+                        <p className="text-red-500 text-xs mt-1">{modelError}</p>
+                    ) : (
+                        <p className="text-[10px] text-slate-400 mt-1 italic">Required</p>
+                    )}
+                </div>
+            </div>
+
+            <div className="flex justify-end mt-6">
+                <button
+                    onClick={onDelete}
+                    className="px-4 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm font-medium hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
+                >
+                    Delete
+                </button>
+            </div>
+        </div>
+    );
+}
+
+
+
 const ServiceItem: React.FC<{ config: ServiceConfig }> = ({ config }) => (
     <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-4 flex items-center justify-between hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
         <div className="flex items-center gap-4">
@@ -569,6 +749,30 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({ onClose }) => {
                                     onDelete={async () => {
                                         try {
                                             await invoke('delete_llm_service', { providerName: 'ollama' });
+                                            removeService(service.id);
+                                        } catch (error) {
+                                            console.error("Failed to delete service:", error);
+                                        }
+                                    }}
+                                />
+                            ) : service.id === 'custom' ? (
+                                <CustomConfig
+                                    key={service.id}
+                                    onDelete={async () => {
+                                        try {
+                                            await invoke('delete_llm_service', { providerName: 'custom' });
+                                            removeService(service.id);
+                                        } catch (error) {
+                                            console.error("Failed to delete service:", error);
+                                        }
+                                    }}
+                                />
+                            ) : service.id === 'custom' ? (
+                                <CustomConfig
+                                    key={service.id}
+                                    onDelete={async () => {
+                                        try {
+                                            await invoke('delete_llm_service', { providerName: 'custom' });
                                             removeService(service.id);
                                         } catch (error) {
                                             console.error("Failed to delete service:", error);
