@@ -41,5 +41,6 @@ pub struct LMStudioConfig {
 pub struct CustomConfig {
     pub name: String,
     pub base_url: String,
+    pub model: String,
     pub api_key: Option<String>,
 }

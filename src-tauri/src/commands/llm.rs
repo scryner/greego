@@ -5,11 +5,11 @@ use crate::llm::{
         config::{
             AnthropicConfig, CustomConfig, GoogleConfig, LMStudioConfig, OllamaConfig, OpenAIConfig,
         },
+        custom::CustomService,
         google::GoogleService,
         lmstudio::LMStudioService,
         ollama::OllamaService,
         openai::OpenAiService,
-        openai_compatible::OpenAiCompatibleService,
     },
     LlmServiceManager,
 };
@@ -70,7 +70,12 @@ pub async fn add_llm_service(
         "custom" => {
             let config: CustomConfig = serde_json::from_value(provider_conf)
                 .map_err(|e| format!("Invalid config for Custom: {}", e))?;
-            let service = OpenAiCompatibleService::new(config.base_url, config.api_key, timeout);
+            let service = CustomService::new(
+                config.base_url,
+                config.api_key,
+                config.model.clone(),
+                timeout,
+            );
             manager.add_service(config.name.clone(), Box::new(service));
             // Note: User might want 'name' for the key in manager?
             // "name" in CustomConfig might be the display name or ID in UI.
