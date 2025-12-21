@@ -12,7 +12,7 @@ fn main() {
 
     if target_os == "macos" && has_apple_feature {
         let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-        let swift_file = manifest_dir.join("src/llm/bridge.swift");
+        let swift_file = manifest_dir.join("src/llm/provider/apple/bridge.swift");
         let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
         let lib_name = "apple_llm_bridge";
         let lib_filename = format!("lib{}.a", lib_name);
