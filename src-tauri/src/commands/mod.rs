@@ -112,6 +112,7 @@ pub async fn invoke_chat_command(
     llm_service: State<'_, Arc<dyn LlmService + Send + Sync>>,
     canvas_id: String,
     prompt: String,
+    model: String, // Added model parameter
     x: f64,
     y: f64,
     parent_id: Option<String>,
@@ -196,7 +197,7 @@ pub async fn invoke_chat_command(
             user_input: Message::new_text(Role::User, prompt_clone.clone()),
         };
 
-        match llm_service.chat_stream(input).await {
+        match llm_service.chat_stream(&model, input).await {
             Ok(mut stream) => {
                 let mut full_text = String::new();
                 while let Some(chunk_res) = stream.next().await {

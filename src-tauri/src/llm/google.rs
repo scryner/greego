@@ -6,21 +6,16 @@ use std::time::Duration;
 pub struct GoogleService {
     client: reqwest::Client,
     api_key: String,
-    model: String,
 }
 
 impl GoogleService {
-    pub fn new(api_key: String, model: String, timeout: Duration) -> Self {
+    pub fn new(api_key: String, timeout: Duration) -> Self {
         let client = reqwest::Client::builder()
             .timeout(timeout)
             .build()
             .unwrap_or_else(|_| reqwest::Client::new());
 
-        Self {
-            client,
-            api_key,
-            model,
-        }
+        Self { client, api_key }
     }
 }
 
@@ -86,7 +81,7 @@ struct GoogleUsage {
 
 #[async_trait]
 impl LlmService for GoogleService {
-    async fn chat_completion(&self, input: LlmInput) -> anyhow::Result<LlmOutput> {
+    async fn chat_completion(&self, model: &str, input: LlmInput) -> anyhow::Result<LlmOutput> {
         let mut contents = Vec::new();
 
         for msg in input.history {
@@ -109,7 +104,7 @@ impl LlmService for GoogleService {
 
         let url = format!(
             "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
-            self.model, self.api_key
+            model, self.api_key
         );
 
         let response = self.client.post(&url).json(&request_body).send().await?;
@@ -150,6 +145,7 @@ impl LlmService for GoogleService {
 
     async fn chat_stream(
         &self,
+        model: &str,
         input: LlmInput,
     ) -> anyhow::Result<
         std::pin::Pin<
@@ -179,7 +175,7 @@ impl LlmService for GoogleService {
         // Use streamGenerateContent with alt=sse for Server-Sent Events
         let url = format!(
             "https://generativelanguage.googleapis.com/v1beta/models/{}:streamGenerateContent?key={}&alt=sse",
-            self.model, self.api_key
+            model, self.api_key
         );
 
         let response = self.client.post(&url).json(&request_body).send().await?;
@@ -307,11 +303,7 @@ mod tests {
     #[ignore]
     async fn test_google_completion() {
         let api_key = get_api_key();
-        let service = GoogleService::new(
-            api_key,
-            "gemini-2.5-flash".to_string(),
-            Duration::from_secs(30),
-        );
+        let service = GoogleService::new(api_key, Duration::from_secs(30));
 
         let input = LlmInput {
             system_prompt: Some("You are a helpful assistant.".to_string()),
@@ -319,7 +311,7 @@ mod tests {
             user_input: Message::new_text(Role::User, "Hello, tell me a short joke."),
         };
 
-        let result = service.chat_completion(input).await;
+        let result = service.chat_completion("gemini-2.5-flash", input).await;
 
         match result {
             Ok(output) => {
@@ -336,18 +328,14 @@ mod tests {
         use futures::StreamExt;
 
         let api_key = get_api_key();
-        let service = GoogleService::new(
-            api_key,
-            "gemini-2.5-flash".to_string(),
-            Duration::from_secs(30),
-        );
+        let service = GoogleService::new(api_key, Duration::from_secs(30));
         let input = LlmInput {
             system_prompt: Some("You are a helpful assistant.".to_string()),
             history: vec![],
             user_input: Message::new_text(Role::User, "Hello, tell me a short joke."),
         };
 
-        let result = service.chat_stream(input).await;
+        let result = service.chat_stream("gemini-2.5-flash", input).await;
 
         match result {
             Ok(mut stream) => {

@@ -1,7 +1,9 @@
 pub mod anthropic;
 pub mod config;
 pub mod google;
+pub mod lmstudio;
 pub mod openai;
+pub mod openai_compatible;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -74,10 +76,15 @@ use std::pin::Pin;
 
 #[async_trait]
 pub trait LlmService: Send + Sync {
-    async fn chat_completion(&self, input: LlmInput) -> anyhow::Result<LlmOutput>;
+    async fn chat_completion(&self, model: &str, input: LlmInput) -> anyhow::Result<LlmOutput>;
 
     async fn chat_stream(
         &self,
+        model: &str,
         input: LlmInput,
     ) -> anyhow::Result<Pin<Box<dyn Stream<Item = anyhow::Result<LlmStreamChunk>> + Send>>>;
+
+    async fn get_available_models(&self) -> anyhow::Result<Option<Vec<String>>> {
+        Ok(None)
+    }
 }

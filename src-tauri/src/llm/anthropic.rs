@@ -7,21 +7,16 @@ use std::time::Duration;
 pub struct AnthropicService {
     client: reqwest::Client,
     api_key: String,
-    model: String,
 }
 
 impl AnthropicService {
-    pub fn new(api_key: String, model: String, timeout: Duration) -> Self {
+    pub fn new(api_key: String, timeout: Duration) -> Self {
         let client = reqwest::Client::builder()
             .timeout(timeout)
             .build()
             .unwrap_or_else(|_| reqwest::Client::new());
 
-        Self {
-            client,
-            api_key,
-            model,
-        }
+        Self { client, api_key }
     }
 }
 
@@ -79,7 +74,7 @@ struct AnthropicUsage {
 
 #[async_trait]
 impl LlmService for AnthropicService {
-    async fn chat_completion(&self, input: LlmInput) -> anyhow::Result<LlmOutput> {
+    async fn chat_completion(&self, model: &str, input: LlmInput) -> anyhow::Result<LlmOutput> {
         let mut messages = Vec::new();
 
         for msg in input.history {
@@ -91,7 +86,7 @@ impl LlmService for AnthropicService {
         let max_tokens = 4096;
 
         let request_body = CreateMessageRequest {
-            model: self.model.clone(),
+            model: model.to_string(),
             messages,
             system,
             max_tokens,
@@ -139,6 +134,7 @@ impl LlmService for AnthropicService {
 
     async fn chat_stream(
         &self,
+        model: &str,
         input: LlmInput,
     ) -> anyhow::Result<
         std::pin::Pin<
@@ -156,7 +152,7 @@ impl LlmService for AnthropicService {
         let max_tokens = 4096;
 
         let mut request_body = serde_json::to_value(CreateMessageRequest {
-            model: self.model.clone(),
+            model: model.to_string(),
             messages,
             system,
             max_tokens,
@@ -257,11 +253,7 @@ mod tests {
     #[ignore]
     async fn test_anthropic_completion() {
         let api_key = get_api_key();
-        let service = AnthropicService::new(
-            api_key,
-            "claude-haiku-4-5".to_string(),
-            Duration::from_secs(30),
-        );
+        let service = AnthropicService::new(api_key, Duration::from_secs(30));
 
         let input = LlmInput {
             system_prompt: Some("You are a helpful assistant.".to_string()),
@@ -269,7 +261,7 @@ mod tests {
             user_input: Message::new_text(Role::User, "Hello, tell me a short joke."),
         };
 
-        let result = service.chat_completion(input).await;
+        let result = service.chat_completion("claude-haiku-4-5", input).await;
 
         match result {
             Ok(output) => {
@@ -286,11 +278,7 @@ mod tests {
         use futures::StreamExt;
 
         let api_key = get_api_key();
-        let service = AnthropicService::new(
-            api_key,
-            "claude-haiku-4-5".to_string(),
-            Duration::from_secs(30),
-        );
+        let service = AnthropicService::new(api_key, Duration::from_secs(30));
 
         let input = LlmInput {
             system_prompt: Some("You are a helpful assistant.".to_string()),
@@ -298,7 +286,7 @@ mod tests {
             user_input: Message::new_text(Role::User, "Hello, tell me a short joke."),
         };
 
-        let result = service.chat_stream(input).await;
+        let result = service.chat_stream("claude-haiku-4-5", input).await;
 
         match result {
             Ok(mut stream) => {
