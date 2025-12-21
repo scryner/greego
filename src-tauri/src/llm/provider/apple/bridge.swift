@@ -488,7 +488,7 @@ public func bridgeGenerateResponseStream(
             for try await cumulativeContent in session.streamResponse(
                 to: promptString, options: options)
             {
-                let currentString = String(describing: cumulativeContent)
+                let currentString = cumulativeContent.content
                 let deltaContent = String(currentString.dropFirst(previousContent.count))
                 previousContent = currentString
 

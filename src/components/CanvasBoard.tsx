@@ -54,13 +54,58 @@ export const CanvasBoard = () => {
 
     useEffect(() => {
         // Listen for backend errors
-        const unlisten = listen<string>('db-error', (event) => {
+        const unlistenError = listen<string>('db-error', (event) => {
+            console.error("DB Error received:", event.payload);
             setError(event.payload);
             setTimeout(() => setError(null), 5000); // Clear after 5s
         });
 
+        const unlistenChatDelta = listen<{ node_id: string, content: string }>('chat-delta', (event) => {
+            // console.log("Chat delta received:", event.payload); // Commented out to reduce noise, enable if needed
+            const { node_id, content } = event.payload;
+            setNodes((nds) => nds.map((node) => {
+                if (getSafeId(node.id) === getSafeId(node_id) && node.type === 'chatNode') {
+                    return {
+                        ...node,
+                        data: {
+                            ...node.data,
+                            content: (node.data.content || '') + content
+                        }
+                    };
+                }
+                return node;
+            }));
+        });
+
+        const unlistenChatDone = listen<{ node_id: string, full_text: string }>('chat-done', (event) => {
+            console.log("Chat done received:", event.payload);
+            const { node_id, full_text } = event.payload;
+            setNodes((nds) => nds.map((node) => {
+                if (getSafeId(node.id) === getSafeId(node_id) && node.type === 'chatNode') {
+                    return {
+                        ...node,
+                        data: {
+                            ...node.data,
+                            content: full_text
+                        }
+                    };
+                }
+                return node;
+            }));
+        });
+
+        const unlistenChatError = listen<{ node_id: string, error: string }>('chat-error', (event) => {
+            console.error("Chat error received:", event.payload);
+            const { error } = event.payload;
+            setError(`Chat Error: ${error}`);
+            setTimeout(() => setError(null), 5000);
+        });
+
         return () => {
-            unlisten.then(u => u());
+            unlistenError.then(u => u());
+            unlistenChatDelta.then(u => u());
+            unlistenChatDone.then(u => u());
+            unlistenChatError.then(u => u());
         };
     }, []);
 
@@ -110,12 +155,14 @@ export const CanvasBoard = () => {
             const nodeData = tempNode?.data as any;
             const parentId = nodeData?.parentId;
             const relationType = nodeData?.relationType;
+            const selectedModel = nodeData?.selectedModel || "apple/Apple Foundation Model";
 
             // Invoke backend
             const canvasId = "canvas:main";
             const newNodes = await GraphAPI.invokeChat(
                 canvasId,
                 text,
+                selectedModel,
                 tempPos ? tempPos.x : 0,
                 tempPos ? tempPos.y : 0,
                 parentId,
@@ -191,7 +238,7 @@ export const CanvasBoard = () => {
             id: nodeId,
             position: n.position,
             data: {
-                content: nodeData?.text || JSON.stringify(nodeData),
+                content: (nodeData?.text !== undefined) ? nodeData.text : (JSON.stringify(nodeData) || ""),
                 title: nodeData?.prompt || (nodeData?.role === 'user' ? 'Me' : 'AI'),
                 onDelete: handleDeleteNode,
                 onAddNode: (direction) => handleAddNodeAtDirection(nodeId, direction),
@@ -271,11 +318,29 @@ export const CanvasBoard = () => {
         };
     };
 
+    const handleModelSelect = (nodeId: string, model: string) => {
+        setNodes((nds) => nds.map((node) => {
+            if (node.id === nodeId && node.type === 'promptInputNode') {
+                return {
+                    ...node,
+                    data: {
+                        ...node.data,
+                        selectedModel: model
+                    }
+                };
+            }
+            return node;
+        }));
+    };
+
     const handleAddNode = () => {
         const id = `temp-${Date.now()}`;
 
         // Calculate smart position
         const position = findSmartPosition();
+
+        // Default model
+        const defaultModel = "apple/Apple Foundation Model";
 
         const newNode: PromptInputNodeType = {
             id,
@@ -283,10 +348,11 @@ export const CanvasBoard = () => {
             type: 'promptInputNode',
             data: {
                 title: 'New chat',
+                selectedModel: defaultModel,
                 footer: (
                     <ModelSelector
-                        currentModel="lms/gpt-oss-120b"
-                        onModelSelect={(model) => console.log("Selected model:", model)}
+                        currentModel={defaultModel}
+                        onModelSelect={(model) => handleModelSelect(id, model)}
                     />
                 ),
                 onDelete: handleDeleteNode,
@@ -339,6 +405,10 @@ export const CanvasBoard = () => {
                 break;
         }
 
+        // Inherit model from parent if possible, or use default
+        // const parentModel = (parentNode.data as any).selectedModel;
+        const defaultModel = "apple/Apple Foundation Model";
+
         const newNode: PromptInputNodeType = {
             id,
             position: { x, y },
@@ -347,10 +417,11 @@ export const CanvasBoard = () => {
                 title: 'New chat',
                 parentId: nodeId, // Store parent ID
                 relationType: relationType, // Store relation type
+                selectedModel: defaultModel,
                 footer: (
                     <ModelSelector
-                        currentModel="lms/gpt-oss-120b"
-                        onModelSelect={(model) => console.log("Selected model:", model)}
+                        currentModel={defaultModel}
+                        onModelSelect={(model) => handleModelSelect(id, model)}
                     />
                 ),
                 onDelete: handleDeleteNode,

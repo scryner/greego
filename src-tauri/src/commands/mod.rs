@@ -2,6 +2,7 @@ use crate::db::schema::{Derives, Node, Sequences};
 use crate::db::Database;
 // use crate::llm::LlmService; // Removed
 use crate::llm::LlmServiceManager; // Added
+use log::error;
 use std::sync::Arc;
 use tauri::State;
 use tokio::sync::RwLock; // Added
@@ -116,7 +117,7 @@ pub async fn invoke_chat_command(
     llm_service: State<'_, Arc<RwLock<LlmServiceManager>>>, // Changed type
     canvas_id: String,
     prompt: String,
-    model: String,
+    model_id: String,
     x: f64,
     y: f64,
     parent_id: Option<String>,
@@ -188,6 +189,11 @@ pub async fn invoke_chat_command(
     let node_id_clone = node_id.clone();
     let _state_clone = state.inner().clone();
 
+    println!(
+        "Starting chat background task for node_id: {}",
+        node_id_clone
+    );
+
     tokio::spawn(async move {
         let input = LlmInput {
             system_prompt: Some("You are a helpful assistant.".to_string()),
@@ -197,29 +203,23 @@ pub async fn invoke_chat_command(
 
         // Acquire read lock and call stream
         let manager_guard = llm_manager_arc.read().await;
-        // The stream must not outlive the guard?
-        // chat_stream returns a Pin<Box<Stream + Send>>.
-        // Does expected stream lifetime depend on &self?
-        // LlmServiceManager::chat_stream signature:
-        // fn chat_stream(&self, ...) -> ... Pin<Box<dyn Stream ... >>
-        // Usually, if the stream holds reference to self (manager), then we have a problem because guard is dropped.
-        // Let's check LlmServiceManager::chat_stream impl.
-        // It gets model from HashMap.
-        // It calls service.chat_stream.
-        // Service.chat_stream returns a stream.
-        // If the service's stream owns the Future/Stream, independent of &self, it works.
-        // Most HTTP client (reqwest) streams are independent of the client if client is cloned or internally ref-counted (reqwest::Client is).
-        // Our services hold reqwest::Client which is cheap to clone or internally Arc.
-        // BUT `LlmModel` is inside `HashMap`.
-        // `manager.services.get` returns reference.
-        // `service.chat_stream` is called on that reference.
-        // If `service.chat_stream` returns a Future/Stream that captures `&self` (the service), then it captures reference to Manager's map value.
-        // Which is tied to `manager_guard`.
-        // So `stream` cannot outlive `manager_guard`.
-        // If we iterate stream inside this block, it is fine!
-        // We just need to make sure we keep the guard until stream is done.
 
-        match manager_guard.chat_stream(&model, &model, input).await {
+        // Parse service_id and model_name
+        // Assuming format is "service_name/model_name"
+        let (service_id, model_name) = match model_id.split_once('/') {
+            Some((s, m)) => (s, m),
+            None => (model_id.as_str(), ""),
+        };
+
+        println!(
+            "Requesting chat stream: service_id='{}', model_name='{}'",
+            service_id, model_name
+        );
+
+        match manager_guard
+            .chat_stream(service_id, model_name, input)
+            .await
+        {
             Ok(mut stream) => {
                 let mut full_text = String::new();
                 while let Some(chunk_res) = stream.next().await {
@@ -233,6 +233,8 @@ pub async fn invoke_chat_command(
                                 "content": chunk.content,
                             }),
                         );
+                    } else {
+                        error!("Error receiving chunk");
                     }
                 }
 
@@ -245,6 +247,7 @@ pub async fn invoke_chat_command(
                 );
             }
             Err(e) => {
+                error!("Error starting chat stream: {}", e);
                 let _ = app_handle_clone.emit(
                     "chat-error",
                     json!({

@@ -62,8 +62,8 @@ export const GraphAPI = {
         return [nodes, edges];
     },
 
-    invokeChat: async (canvasId: string, prompt: string, x: number, y: number, parentId?: string, relationType?: 'sequence' | 'derive'): Promise<ChatNode[]> => {
-        return await invoke('invoke_chat_command', { canvasId, prompt, x, y, parentId, relationType });
+    invokeChat: async (canvasId: string, prompt: string, model: string, x: number, y: number, parentId?: string, relationType?: 'sequence' | 'derive'): Promise<ChatNode[]> => {
+        return await invoke('invoke_chat_command', { canvasId, prompt, modelId: model, x, y, parentId, relationType });
     },
 
     deleteNode: async (nodeId: string): Promise<void> => {

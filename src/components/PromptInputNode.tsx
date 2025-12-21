@@ -7,6 +7,8 @@ export type PromptInputNodeData = {
     title?: string;
     parentId?: string;
     relationType?: 'sequence' | 'derive';
+    selectedModel?: string; // Add selectedModel
+    onModelSelect?: (model: string) => void; // Add callback
     footer?: ReactNode;
     headerClassName?: string;
     containerClassName?: string;
@@ -181,6 +183,9 @@ export const PromptInputNode = ({ id, data }: NodeProps<PromptInputNodeType>) =>
                                             onClick={() => {
                                                 setSelectedModel(modelStr);
                                                 setIsModelSelectorOpen(false);
+                                                if (data.onModelSelect) {
+                                                    data.onModelSelect(modelStr);
+                                                }
                                             }}
                                             className={`w-full text-left px-3 py-2 text-xs transition-colors truncate ${selectedModel === modelStr ? 'bg-primary/10 text-primary font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
                                         >
