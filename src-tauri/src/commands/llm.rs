@@ -109,3 +109,21 @@ pub async fn add_llm_service(
 
     Ok(())
 }
+
+#[tauri::command]
+pub async fn delete_llm_service(
+    state: State<'_, Arc<RwLock<LlmServiceManager>>>,
+    provider_name: String,
+) -> Result<(), String> {
+    let mut manager = state.write().await;
+    manager.delete_service(&provider_name);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn list_llm_services(
+    state: State<'_, Arc<RwLock<LlmServiceManager>>>,
+) -> Result<Vec<String>, String> {
+    let manager = state.read().await;
+    Ok(manager.list_services())
+}

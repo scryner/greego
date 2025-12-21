@@ -55,6 +55,8 @@ pub fn run() {
             commands::load_canvas_command,
             commands::invoke_chat_command,
             commands::llm::add_llm_service, // Added
+            commands::llm::delete_llm_service,
+            commands::llm::list_llm_services,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

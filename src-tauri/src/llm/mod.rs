@@ -5,6 +5,7 @@ use std::pin::Pin;
 
 use anyhow::{anyhow, Result};
 
+use log::debug;
 pub use provider::{
     anthropic, config, google, lmstudio, openai, openai_compatible, ContentPart, LlmInput,
     LlmOutput, LlmService, LlmStreamChunk, Message, Role, TokenUsage,
@@ -38,7 +39,19 @@ impl LlmServiceManager {
     }
 
     pub fn add_service(&mut self, name: String, service: Box<dyn LlmService>) {
-        self.services.insert(name, service);
+        self.services.insert(name.clone(), service);
+        let all_services: Vec<_> = self.services.keys().collect();
+        debug!("added LLM service: {} / {:?}", name, all_services);
+    }
+
+    pub fn delete_service(&mut self, name: &str) {
+        self.services.remove(name);
+        let all_services: Vec<_> = self.services.keys().collect();
+        debug!("removed LLM service: {} / {:?}", name, all_services);
+    }
+
+    pub fn list_services(&self) -> Vec<String> {
+        self.services.keys().cloned().collect()
     }
 
     pub async fn chat_completion(
