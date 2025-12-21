@@ -54,6 +54,26 @@ impl LlmServiceManager {
         self.services.keys().cloned().collect()
     }
 
+    pub async fn get_all_available_models(&self) -> Vec<String> {
+        let mut all_models = Vec::new();
+        for (service_name, service) in &self.services {
+            match service.get_available_models().await {
+                Ok(Some(models)) => {
+                    for model in models {
+                        all_models.push(format!("{}/{}", service_name, model));
+                    }
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    log::error!("Failed to get models for {}: {}", service_name, e);
+                }
+            }
+        }
+        all_models.sort();
+        debug!("get_all_available_models: {:?}", all_models);
+        all_models
+    }
+
     pub async fn chat_completion(
         &self,
         service_name: &str,

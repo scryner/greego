@@ -1,6 +1,7 @@
 // Define the data structure for prompt input node (before submitting)
-import { type ReactNode, useState } from 'react';
-import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
+import { type ReactNode, useState, useEffect } from 'react';
+import { Handle, Position, type NodeProps, type Node, useHandleConnections, useNodesData } from '@xyflow/react';
+import { invoke } from '@tauri-apps/api/core';
 
 export type PromptInputNodeData = {
     title?: string;
@@ -23,7 +24,6 @@ export type PromptInputNodeType = Node<PromptInputNodeData, 'promptInputNode'>;
 export const PromptInputNode = ({ id, data }: NodeProps<PromptInputNodeType>) => {
     const {
         title = 'New chat',
-        footer,
         headerClassName = "border-b border-border-light dark:border-border-dark",
         containerClassName = "",
         onDelete,
@@ -32,6 +32,40 @@ export const PromptInputNode = ({ id, data }: NodeProps<PromptInputNodeType>) =>
     } = data;
 
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+    // Model selection state
+    const [selectedModel, setSelectedModel] = useState<string>("");
+    const [availableModels, setAvailableModels] = useState<string[]>([]);
+    const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
+
+    // React Flow hooks to inspect upstream connection
+    const connections = useHandleConnections({
+        type: 'target',
+    });
+    // We assume the first connection is the primary flow
+    const upstreamNodeData = useNodesData(connections[0]?.source) as any;
+
+    // Effect: Inherit model from upstream node on mount or connection change
+    useEffect(() => {
+        if (connections.length > 0 && upstreamNodeData?.selectedModel) {
+            setSelectedModel(upstreamNodeData.selectedModel);
+        } else {
+            // No upstream connection or no model in upstream -> Default empty
+            setSelectedModel("");
+        }
+    }, [connections.length, upstreamNodeData]);
+
+    const handleModelSelectorClick = async () => {
+        if (!isModelSelectorOpen) {
+            try {
+                const models = await invoke<string[]>('get_llm_available_models');
+                setAvailableModels(models);
+            } catch (error) {
+                console.error("Failed to fetch models:", error);
+            }
+        }
+        setIsModelSelectorOpen(!isModelSelectorOpen);
+    };
 
     return (
         <div className={`bg-white dark:bg-surface-dark rounded-2xl shadow-sm border border-slate-200 dark:border-border-dark flex flex-col min-w-[320px] max-w-[400px] transition-shadow hover:shadow-md ${containerClassName} relative group`}>
@@ -70,9 +104,6 @@ export const PromptInputNode = ({ id, data }: NodeProps<PromptInputNodeType>) =>
                             />
 
                             <div className="absolute right-0 top-full mt-2 w-40 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-100 dark:border-slate-700 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-right">
-                                {/* Arrow pointing up */}
-                                <div className="absolute -top-1.5 right-3 w-3 h-3 bg-white dark:bg-slate-800 transform rotate-45 border-t border-l border-slate-100 dark:border-slate-700"></div>
-
                                 <div className="flex flex-col py-1 relative bg-white dark:bg-slate-800 rounded-lg">
                                     <button
                                         onClick={() => {
@@ -91,6 +122,8 @@ export const PromptInputNode = ({ id, data }: NodeProps<PromptInputNodeType>) =>
                 </div>
             </div>
 
+
+
             {/* Content: Input Field */}
             <div className="p-4">
                 <div className="w-full">
@@ -105,6 +138,10 @@ export const PromptInputNode = ({ id, data }: NodeProps<PromptInputNodeType>) =>
                                 if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
                                     e.preventDefault();
                                     if (onSubmit) {
+                                        // Pass selected model? onSubmit signature is (text, nodeId).
+                                        // Usually data update happens via hooks or separate context.
+                                        // We might want to pass the model to the node data so it executes with it?
+                                        // For now, adhering to existing onSubmit signature.
                                         onSubmit(e.currentTarget.value, id);
                                     }
                                 }
@@ -118,12 +155,46 @@ export const PromptInputNode = ({ id, data }: NodeProps<PromptInputNodeType>) =>
                 </div>
             </div>
 
-            {/* Optional Footer */}
-            {footer && (
-                <div className="px-4 py-3 text-xs text-slate-400 dark:text-slate-500 font-medium">
-                    {footer}
+            {/* Footer with Model Selector */}
+            <div className="px-4 py-3 text-xs text-slate-400 dark:text-slate-500 font-medium border-t border-slate-100 dark:border-slate-700/50">
+                <div className="relative inline-block">
+                    <button
+                        onClick={handleModelSelectorClick}
+                        className="flex items-center gap-1 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                    >
+                        {selectedModel || "Select model"}
+                        <span className="material-icons-round text-[10px] opacity-70">expand_more</span>
+                    </button>
+
+                    {isModelSelectorOpen && (
+                        <>
+                            {/* Transparent backdrop for model menu */}
+                            <div
+                                className="fixed inset-0 z-40 cursor-default"
+                                onClick={() => setIsModelSelectorOpen(false)}
+                            />
+                            <div className="absolute left-0 top-full mt-1 w-56 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 z-50 overflow-hidden max-h-60 overflow-y-auto">
+                                {availableModels.length > 0 ? (
+                                    availableModels.map((modelStr) => (
+                                        <button
+                                            key={modelStr}
+                                            onClick={() => {
+                                                setSelectedModel(modelStr);
+                                                setIsModelSelectorOpen(false);
+                                            }}
+                                            className={`w-full text-left px-3 py-2 text-xs transition-colors truncate ${selectedModel === modelStr ? 'bg-primary/10 text-primary font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                                        >
+                                            {modelStr}
+                                        </button>
+                                    ))
+                                ) : (
+                                    <div className="px-3 py-2 text-xs text-slate-400 italic">No models found</div>
+                                )}
+                            </div>
+                        </>
+                    )}
                 </div>
-            )}
+            </div>
 
             {/* Source Handles (Outputs) */}
             {handles.source?.map((pos) => (

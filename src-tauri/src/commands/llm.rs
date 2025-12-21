@@ -141,3 +141,11 @@ pub async fn list_llm_services(
     let manager = state.read().await;
     Ok(manager.list_services())
 }
+
+#[tauri::command]
+pub async fn get_llm_available_models(
+    state: State<'_, Arc<RwLock<LlmServiceManager>>>,
+) -> Result<Vec<String>, String> {
+    let manager = state.read().await;
+    Ok(manager.get_all_available_models().await)
+}

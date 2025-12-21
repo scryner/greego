@@ -57,6 +57,7 @@ pub fn run() {
             commands::llm::add_llm_service, // Added
             commands::llm::delete_llm_service,
             commands::llm::list_llm_services,
+            commands::llm::get_llm_available_models,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
