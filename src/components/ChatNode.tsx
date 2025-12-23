@@ -42,7 +42,7 @@ export const ChatNode = ({ id, data }: NodeProps<ChatNodeType>) => {
                     type="target"
                     position={pos}
                     id={`target-${pos}`}
-                    className="!w-3 !h-3 !bg-slate-300 dark:!bg-slate-500 !border-2 !border-white dark:!border-slate-800"
+                    className="!w-3 !h-3 !bg-slate-300 dark:!bg-slate-500 !border-2 !border-white dark:!border-slate-800 opacity-0 group-hover:opacity-100 transition-opacity"
                 />
             ))}
 
@@ -119,7 +119,7 @@ export const ChatNode = ({ id, data }: NodeProps<ChatNodeType>) => {
                     type="source"
                     position={pos}
                     id={`source-${pos}`}
-                    className="!w-3 !h-3 !bg-slate-300 dark:!bg-slate-500 !border-2 !border-white dark:!border-slate-800"
+                    className="!w-3 !h-3 !bg-slate-300 dark:!bg-slate-500 !border-2 !border-white dark:!border-slate-800 opacity-0 group-hover:opacity-100 transition-opacity"
                 />
             ))}
 
