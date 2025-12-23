@@ -1,5 +1,5 @@
 // Define the data structure for prompt input node (before submitting)
-import { type ReactNode, useState, useEffect } from 'react';
+import { type ReactNode, useState, useEffect, useRef } from 'react';
 import { Handle, Position, type NodeProps, type Node, useHandleConnections, useNodesData } from '@xyflow/react';
 import { invoke } from '@tauri-apps/api/core';
 
@@ -36,7 +36,7 @@ export const PromptInputNode = ({ id, data }: NodeProps<PromptInputNodeType>) =>
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
     // Model selection state
-    const [selectedModel, setSelectedModel] = useState<string>("");
+    const [selectedModel, setSelectedModel] = useState<string>(data.selectedModel || "");
     const [availableModels, setAvailableModels] = useState<string[]>([]);
     const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
 
@@ -51,13 +51,21 @@ export const PromptInputNode = ({ id, data }: NodeProps<PromptInputNodeType>) =>
 
     // Effect: Inherit model from upstream node on mount or connection change
     useEffect(() => {
-        if (connections.length > 0 && upstreamNodeData?.selectedModel) {
-            setSelectedModel(upstreamNodeData.selectedModel);
+        if (connections.length > 0) {
+            if (upstreamNodeData?.selectedModel) {
+                setSelectedModel(upstreamNodeData.selectedModel);
+            }
         } else {
-            // No upstream connection or no model in upstream -> Default empty
-            setSelectedModel("");
+            // No upstream connection -> Keep existing or default?
+            // If strictly creating a new independent node, maybe default.
+            // But if we initialized from data.selectedModel, we might want to keep it.
+            // For now, let's only set to empty if we truly have no model.
+            // Actually, if there is no connection, we generally want "Select model".
+            if (!data.selectedModel) {
+                setSelectedModel("");
+            }
         }
-    }, [connections.length, upstreamNodeData]);
+    }, [connections.length, upstreamNodeData, data.selectedModel]);
 
     const handleModelSelectorClick = async () => {
         if (!isModelSelectorOpen) {
@@ -70,6 +78,19 @@ export const PromptInputNode = ({ id, data }: NodeProps<PromptInputNodeType>) =>
         }
         setIsModelSelectorOpen(!isModelSelectorOpen);
     };
+
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    // Auto-focus on mount
+    useEffect(() => {
+        // Use timeout to ensure DOM is ready and override any immediate focus stealing
+        const timer = setTimeout(() => {
+            if (inputRef.current) {
+                inputRef.current.focus();
+            }
+        }, 100);
+        return () => clearTimeout(timer);
+    }, []);
 
     return (
         <div className={`bg-white dark:bg-surface-dark rounded-2xl shadow-sm border border-slate-200 dark:border-border-dark flex flex-col min-w-[320px] max-w-[400px] transition-shadow hover:shadow-md ${containerClassName} relative group`}>
@@ -134,10 +155,10 @@ export const PromptInputNode = ({ id, data }: NodeProps<PromptInputNodeType>) =>
                     {/* Pill-shaped input container */}
                     <div className="relative group">
                         <input
+                            ref={inputRef}
                             type="text"
                             className="w-full pl-10 pr-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-full text-sm text-slate-700 dark:text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
                             placeholder="Ask anything..."
-                            autoFocus
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
                                     e.preventDefault();

@@ -205,6 +205,7 @@ mod tests {
             position: NodePosition { x: 100.0, y: 100.0 },
             type_: NodeType::Chat {
                 value: serde_json::json!({"text": "Hello"}),
+                model_id: None,
             },
         }
     }

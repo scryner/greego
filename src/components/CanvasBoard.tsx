@@ -240,6 +240,7 @@ export const CanvasBoard = () => {
             data: {
                 content: (nodeData?.text !== undefined) ? nodeData.text : (JSON.stringify(nodeData) || ""),
                 title: nodeData?.prompt || (nodeData?.role === 'user' ? 'Me' : 'AI'),
+                selectedModel: (n.type as any)?.data?.model_id,
                 onDelete: handleDeleteNode,
                 onAddNode: (direction) => handleAddNodeAtDirection(nodeId, direction),
                 handles: {
@@ -406,9 +407,9 @@ export const CanvasBoard = () => {
                 break;
         }
 
-        // Inherit model from parent if possible, or use default
-        // const parentModel = (parentNode.data as any).selectedModel;
-        const defaultModel = "";
+        // Inherit model from parent, or use default
+        const parentModel = (parentNode.data as any).selectedModel;
+        const defaultModel = parentModel || "";
 
         const newNode: PromptInputNodeType = {
             id,

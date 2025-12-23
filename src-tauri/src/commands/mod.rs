@@ -146,6 +146,7 @@ pub async fn invoke_chat_command(
                 "text": assistant_response_placeholder,
                 "role": "assistant"
             }),
+            model_id: Some(model_id.clone()),
         },
     };
 

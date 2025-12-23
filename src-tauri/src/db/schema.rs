@@ -20,9 +20,17 @@ pub struct NodePosition {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "data", rename_all = "camelCase")]
 pub enum NodeType {
-    Chat { value: serde_json::Value },
-    Link { url: Url },
-    File { path: PathBuf },
+    Chat {
+        value: serde_json::Value,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        model_id: Option<String>,
+    },
+    Link {
+        url: Url,
+    },
+    File {
+        path: PathBuf,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
