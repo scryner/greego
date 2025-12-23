@@ -155,7 +155,7 @@ export const CanvasBoard = () => {
             const nodeData = tempNode?.data as any;
             const parentId = nodeData?.parentId;
             const relationType = nodeData?.relationType;
-            const selectedModel = nodeData?.selectedModel || "apple/Apple Foundation Model";
+            const selectedModel = nodeData?.selectedModel || "";
 
             // Invoke backend
             const canvasId = "canvas:main";
@@ -340,7 +340,7 @@ export const CanvasBoard = () => {
         const position = findSmartPosition();
 
         // Default model
-        const defaultModel = "apple/Apple Foundation Model";
+        const defaultModel = "";
 
         const newNode: PromptInputNodeType = {
             id,
@@ -357,6 +357,7 @@ export const CanvasBoard = () => {
                 ),
                 onDelete: handleDeleteNode,
                 onSubmit: handleChatSubmit,
+                onModelSelect: (model) => handleModelSelect(id, model),
             },
         };
         setNodes((nds) => [...nds, newNode]);
@@ -407,7 +408,7 @@ export const CanvasBoard = () => {
 
         // Inherit model from parent if possible, or use default
         // const parentModel = (parentNode.data as any).selectedModel;
-        const defaultModel = "apple/Apple Foundation Model";
+        const defaultModel = "";
 
         const newNode: PromptInputNodeType = {
             id,
@@ -426,6 +427,7 @@ export const CanvasBoard = () => {
                 ),
                 onDelete: handleDeleteNode,
                 onSubmit: handleChatSubmit,
+                onModelSelect: (model) => handleModelSelect(id, model),
                 handles: {
                     source: [],
                     target: direction === 'top' ? [Position.Bottom] :

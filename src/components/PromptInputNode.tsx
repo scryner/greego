@@ -40,6 +40,8 @@ export const PromptInputNode = ({ id, data }: NodeProps<PromptInputNodeType>) =>
     const [availableModels, setAvailableModels] = useState<string[]>([]);
     const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
 
+    const [isShaking, setIsShaking] = useState(false);
+
     // React Flow hooks to inspect upstream connection
     const connections = useHandleConnections({
         type: 'target',
@@ -139,6 +141,11 @@ export const PromptInputNode = ({ id, data }: NodeProps<PromptInputNodeType>) =>
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
                                     e.preventDefault();
+                                    if (!selectedModel) {
+                                        setIsShaking(true);
+                                        setTimeout(() => setIsShaking(false), 500);
+                                        return;
+                                    }
                                     if (onSubmit) {
                                         // Pass selected model? onSubmit signature is (text, nodeId).
                                         // Usually data update happens via hooks or separate context.
@@ -162,7 +169,7 @@ export const PromptInputNode = ({ id, data }: NodeProps<PromptInputNodeType>) =>
                 <div className="relative inline-block">
                     <button
                         onClick={handleModelSelectorClick}
-                        className="flex items-center gap-1 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                        className={`flex items-center gap-1 hover:text-slate-600 dark:hover:text-slate-300 transition-colors ${isShaking ? 'animate-shake' : ''}`}
                     >
                         {selectedModel || "Select model"}
                         <span className="material-icons-round text-[10px] opacity-70">expand_more</span>
