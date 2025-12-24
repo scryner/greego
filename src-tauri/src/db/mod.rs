@@ -200,11 +200,20 @@ mod tests {
     }
 
     fn mock_node() -> Node {
+        use crate::llm::{LlmInput, Message, Role};
+        let input = LlmInput {
+            system_prompt: None,
+            history: vec![],
+            user_input: Message::new_text(Role::User, "Hello"),
+        };
         Node {
             id: None,
             position: NodePosition { x: 100.0, y: 100.0 },
             type_: NodeType::Chat {
-                value: serde_json::json!({"text": "Hello"}),
+                data: crate::db::schema::ChatNodeData {
+                    input,
+                    output: None,
+                },
                 model_id: None,
             },
         }

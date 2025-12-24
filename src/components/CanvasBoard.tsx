@@ -232,15 +232,50 @@ export const CanvasBoard = () => {
 
     const transformBackendNode = (n: any): ChatNodeType => {
         const nodeId = getSafeId(n.id);
-        const nodeData = (n.type as any)?.data?.value || n.data;
+
+        // Handle new ChatNodeData structure
+        // n.type is { type: "chat", data: { data: { input: ..., output: ... }, model_id: ... } }
+
+        const nodeTypeWrapper = n.type as any;
+        const variantContent = nodeTypeWrapper?.data;
+        const chatNodeData = variantContent?.data;
+
+        let title = "Chat";
+        let content = "";
+
+        if (chatNodeData?.input?.user_input?.content) {
+            const parts = chatNodeData.input.user_input.content;
+            if (Array.isArray(parts) && parts.length > 0) {
+                const firstPart = parts[0];
+                if (firstPart.type === 'text') {
+                    title = firstPart.content;
+                }
+            }
+        }
+
+        if (chatNodeData?.output?.content) {
+            const parts = chatNodeData.output.content;
+            if (Array.isArray(parts) && parts.length > 0) {
+                const firstPart = parts[0];
+                if (firstPart.type === 'text') {
+                    content = firstPart.content;
+                }
+            }
+        } else if (chatNodeData?.output === null && chatNodeData.input) {
+            content = "";
+        } else if (variantContent?.value) {
+            const oldData = variantContent.value;
+            content = (oldData?.text !== undefined) ? oldData.text : "";
+            title = oldData?.prompt || (oldData?.role === 'user' ? 'Me' : 'AI');
+        }
 
         return {
             id: nodeId,
             position: n.position,
             data: {
-                content: (nodeData?.text !== undefined) ? nodeData.text : (JSON.stringify(nodeData) || ""),
-                title: nodeData?.prompt || (nodeData?.role === 'user' ? 'Me' : 'AI'),
-                selectedModel: (n.type as any)?.data?.model_id,
+                content: content,
+                title: title,
+                selectedModel: variantContent?.model_id,
                 onDelete: handleDeleteNode,
                 onAddNode: (direction) => handleAddNodeAtDirection(nodeId, direction),
                 handles: {

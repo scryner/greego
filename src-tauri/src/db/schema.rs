@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use crate::llm::{LlmInput, LlmOutput};
+
 use serde::{Deserialize, Serialize};
 use surrealdb::sql::Thing;
 use tauri::Url;
@@ -18,10 +20,16 @@ pub struct NodePosition {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatNodeData {
+    pub input: LlmInput,
+    pub output: Option<LlmOutput>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "data", rename_all = "camelCase")]
 pub enum NodeType {
     Chat {
-        value: serde_json::Value,
+        data: ChatNodeData,
         #[serde(skip_serializing_if = "Option::is_none")]
         model_id: Option<String>,
     },

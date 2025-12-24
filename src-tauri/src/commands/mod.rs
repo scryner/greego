@@ -114,7 +114,7 @@ pub async fn move_node_position_command(
 pub async fn invoke_chat_command(
     app_handle: tauri::AppHandle,
     state: State<'_, Database>,
-    llm_service: State<'_, Arc<RwLock<LlmServiceManager>>>, // Changed type
+    llm_service: State<'_, Arc<RwLock<LlmServiceManager>>>,
     canvas_id: String,
     prompt: String,
     model_id: String,
@@ -123,10 +123,9 @@ pub async fn invoke_chat_command(
     parent_id: Option<String>,
     relation_type: Option<String>,
 ) -> Result<Vec<Node>, String> {
-    use crate::db::schema::{NodePosition, NodeType};
-    use crate::llm::{LlmInput, Message, Role};
+    use crate::db::schema::{ChatNodeData, NodePosition, NodeType};
+    use crate::llm::{LlmInput, LlmOutput, Message, Role};
     use futures::StreamExt;
-    use serde_json::json;
     use tauri::Emitter;
 
     let (tb, id_str) = canvas_id
@@ -135,17 +134,20 @@ pub async fn invoke_chat_command(
     let canvas_thing = surrealdb::sql::Thing::from((tb.to_string(), id_str.to_string()));
 
     // 1. Create Consolidated Node (User + Assistant Placeholder)
-    let assistant_response_placeholder = "";
+    let input = LlmInput {
+        system_prompt: Some("You are a helpful assistant.".to_string()),
+        history: vec![], // TODO: Retrieve history from DB based on parent traversal?
+        user_input: Message::new_text(Role::User, prompt.clone()),
+    };
 
     let chat_node = Node {
         id: None,
         position: NodePosition { x, y },
         type_: NodeType::Chat {
-            value: json!({
-                "prompt": prompt,
-                "text": assistant_response_placeholder,
-                "role": "assistant"
-            }),
+            data: ChatNodeData {
+                input: input.clone(),
+                output: None,
+            },
             model_id: Some(model_id.clone()),
         },
     };
@@ -182,13 +184,19 @@ pub async fn invoke_chat_command(
         .clone()
         .ok_or("Failed to get node ID")?
         .to_string();
-    let prompt_clone = prompt.clone();
+
+    // Convert string ID back to Thing for operations
+    let (tb_node, id_node) = node_id.split_once(':').unwrap();
+    let node_thing = surrealdb::sql::Thing::from((tb_node.to_string(), id_node.to_string()));
 
     // Spawn background task
     let llm_manager_arc = llm_service.inner().clone(); // Clone Arc<RwLock<Manager>>
     let app_handle_clone = app_handle.clone();
     let node_id_clone = node_id.clone();
-    let _state_clone = state.inner().clone();
+
+    // Clone client for background task
+    let db_client = state.client.clone();
+    let node_thing_clone = node_thing.clone();
 
     println!(
         "Starting chat background task for node_id: {}",
@@ -196,12 +204,6 @@ pub async fn invoke_chat_command(
     );
 
     tokio::spawn(async move {
-        let input = LlmInput {
-            system_prompt: Some("You are a helpful assistant.".to_string()),
-            history: vec![], // TODO: Retrieve history from DB based on parent traversal?
-            user_input: Message::new_text(Role::User, prompt_clone.clone()),
-        };
-
         // Acquire read lock and call stream
         let manager_guard = llm_manager_arc.read().await;
 
@@ -229,7 +231,7 @@ pub async fn invoke_chat_command(
                         // Emit event
                         let _ = app_handle_clone.emit(
                             "chat-delta",
-                            json!({
+                            serde_json::json!({
                                 "node_id": node_id_clone,
                                 "content": chunk.content,
                             }),
@@ -241,17 +243,32 @@ pub async fn invoke_chat_command(
 
                 let _ = app_handle_clone.emit(
                     "chat-done",
-                    json!({
+                    serde_json::json!({
                         "node_id": node_id_clone,
                         "full_text": full_text
                     }),
                 );
+
+                // Persist the full output
+                use crate::llm::ContentPart; // Ensure these are available if needed or just use LlmOutput
+                let output = LlmOutput {
+                    content: vec![ContentPart::Text(full_text)],
+                    usage: None,
+                    raw: None,
+                };
+
+                use crate::db::operation;
+                if let Err(e) =
+                    operation::update_chat_node_output(&db_client, node_thing_clone, output).await
+                {
+                    error!("Failed to persist chat output: {}", e);
+                }
             }
             Err(e) => {
                 error!("Error starting chat stream: {}", e);
                 let _ = app_handle_clone.emit(
                     "chat-error",
-                    json!({
+                    serde_json::json!({
                         "node_id": node_id_clone,
                         "error": e.to_string()
                     }),

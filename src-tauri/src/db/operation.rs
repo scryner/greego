@@ -218,3 +218,37 @@ pub async fn load_canvas(
     );
     Ok((nodes, derives, sequences))
 }
+
+pub async fn update_chat_node_output(
+    client: &Surreal<Db>,
+    node_id: Thing,
+    output: crate::llm::LlmOutput,
+) -> anyhow::Result<Node> {
+    log::debug!("update_chat_node_output: node_id={}", node_id);
+
+    let sql = r#"
+        UPDATE $node_id
+        SET type.data.output = $output
+        RETURN AFTER
+    "#;
+
+    let mut response = client
+        .query(sql)
+        .bind(("node_id", node_id))
+        .bind(("output", output))
+        .await
+        .inspect_err(|e| log::error!("update_chat_node_output: query failed: {}", e))?;
+
+    let updated: Option<Node> = response.take(0).inspect_err(|e| {
+        log::error!(
+            "update_chat_node_output: failed to retrieve updated node: {}",
+            e
+        )
+    })?;
+    let result = updated.ok_or_else(|| {
+        log::error!("update_chat_node_output: query succeeded but returned no updated node");
+        anyhow::anyhow!("Failed to update chat node output")
+    })?;
+    log::debug!("update_chat_node_output: success, updated={:?}", result);
+    Ok(result)
+}
