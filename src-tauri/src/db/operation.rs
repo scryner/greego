@@ -228,7 +228,7 @@ pub async fn update_chat_node_output(
 
     let sql = r#"
         UPDATE $node_id
-        SET type.data.output = $output
+        SET type.data.data.output = $output
         RETURN AFTER
     "#;
 
@@ -250,5 +250,31 @@ pub async fn update_chat_node_output(
         anyhow::anyhow!("Failed to update chat node output")
     })?;
     log::debug!("update_chat_node_output: success, updated={:?}", result);
+    Ok(result)
+}
+
+pub async fn get_node(client: &Surreal<Db>, node_id: Thing) -> anyhow::Result<Node> {
+    log::debug!("get_node: node_id={}", node_id);
+
+    let sql = r#"
+        SELECT * FROM $node_id;
+    "#;
+
+    let mut response = client
+        .query(sql)
+        .bind(("node_id", node_id))
+        .await
+        .inspect_err(|e| log::error!("get_node: query failed: {}", e))?;
+
+    let node: Option<Node> = response
+        .take(0)
+        .inspect_err(|e| log::error!("get_node: failed to retrieve node from response: {}", e))?;
+
+    let result = node.ok_or_else(|| {
+        log::error!("get_node: query succeeded but returned no node");
+        anyhow::anyhow!("Node not found")
+    })?;
+
+    log::debug!("get_node: success, result={:?}", result);
     Ok(result)
 }

@@ -134,9 +134,37 @@ pub async fn invoke_chat_command(
     let canvas_thing = surrealdb::sql::Thing::from((tb.to_string(), id_str.to_string()));
 
     // 1. Create Consolidated Node (User + Assistant Placeholder)
+    // 1. Create Consolidated Node (User + Assistant Placeholder)
+    let mut history = vec![];
+
+    if let Some(parent_id_str) = &parent_id {
+        if let Some((tb, id)) = parent_id_str.split_once(':') {
+            let parent_thing = surrealdb::sql::Thing::from((tb.to_string(), id.to_string()));
+            use crate::db::operation;
+            if let Ok(parent_node) = operation::get_node(&state.client, parent_thing).await {
+                if let NodeType::Chat { data, .. } = parent_node.type_ {
+                    // Inherit history
+                    history.extend(data.input.history);
+                    // Add parent's user input
+                    history.push(data.input.user_input);
+                    // Add parent's assistant output if available
+                    if let Some(output) = data.output {
+                        // Convert LlmOutput to Message
+                        // LlmOutput has a list of ContentPart, Message expects vec<ContentPart>
+                        let assistant_msg = Message {
+                            role: Role::Assistant,
+                            content: output.content,
+                        };
+                        history.push(assistant_msg);
+                    }
+                }
+            }
+        }
+    }
+
     let input = LlmInput {
         system_prompt: Some("You are a helpful assistant.".to_string()),
-        history: vec![], // TODO: Retrieve history from DB based on parent traversal?
+        history,
         user_input: Message::new_text(Role::User, prompt.clone()),
     };
 
@@ -241,6 +269,23 @@ pub async fn invoke_chat_command(
                     }
                 }
 
+                // Persist the full output
+                use crate::llm::ContentPart; // Ensure these are available if needed or just use LlmOutput
+                let output = LlmOutput {
+                    content: vec![ContentPart::Text(full_text.clone())],
+                    usage: None,
+                    raw: None,
+                };
+
+                use crate::db::operation;
+                if let Err(e) =
+                    operation::update_chat_node_output(&db_client, node_thing_clone.clone(), output)
+                        .await
+                {
+                    error!("Failed to persist chat output: {}", e);
+                }
+
+                // Emit done event AFTER persistence to avoid race conditions
                 let _ = app_handle_clone.emit(
                     "chat-done",
                     serde_json::json!({
@@ -248,21 +293,6 @@ pub async fn invoke_chat_command(
                         "full_text": full_text
                     }),
                 );
-
-                // Persist the full output
-                use crate::llm::ContentPart; // Ensure these are available if needed or just use LlmOutput
-                let output = LlmOutput {
-                    content: vec![ContentPart::Text(full_text)],
-                    usage: None,
-                    raw: None,
-                };
-
-                use crate::db::operation;
-                if let Err(e) =
-                    operation::update_chat_node_output(&db_client, node_thing_clone, output).await
-                {
-                    error!("Failed to persist chat output: {}", e);
-                }
             }
             Err(e) => {
                 error!("Error starting chat stream: {}", e);
