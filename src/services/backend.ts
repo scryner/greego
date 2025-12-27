@@ -5,6 +5,14 @@ export interface NodePosition {
     y: number;
 }
 
+export interface Canvas {
+    id?: string | object;
+    title: string;
+    created_at: string;
+    embedding_id?: string;
+    reranker_id?: string;
+}
+
 // Matching Rust struct ChatNode
 // pub struct ChatNode {
 //     pub id: Option<Thing>,

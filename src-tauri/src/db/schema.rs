@@ -12,8 +12,8 @@ pub struct Canvas {
     pub id: Option<Thing>,
     pub title: String,
     pub created_at: DateTime<Utc>,
-    pub text_embedding_id: Option<String>,
-    pub text_reranker_id: Option<String>,
+    pub embedding_id: Option<String>,
+    pub reranker_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

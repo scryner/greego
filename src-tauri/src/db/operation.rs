@@ -357,8 +357,8 @@ mod tests {
             id: None,
             title: "Test Canvas".to_string(),
             created_at: chrono::Utc::now(),
-            text_embedding_id: None,
-            text_reranker_id: None,
+            embedding_id: None,
+            reranker_id: None,
         }
     }
 

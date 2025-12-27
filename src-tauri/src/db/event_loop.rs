@@ -258,8 +258,8 @@ mod tests {
             id: None,
             title: name.to_string(),
             created_at: chrono::Utc::now(),
-            text_embedding_id: None,
-            text_reranker_id: None,
+            embedding_id: None,
+            reranker_id: None,
         };
         let created = operation::add_canvas(client, canvas).await.unwrap();
         created.id.unwrap()
