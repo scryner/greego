@@ -1,5 +1,6 @@
 pub mod commands;
 pub mod db;
+pub mod embedding;
 pub mod llm;
 
 use db::Database;

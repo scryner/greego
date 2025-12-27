@@ -15,8 +15,6 @@ pub mod events;
 pub mod operation;
 pub mod schema;
 
-mod embedding;
-
 static DB: OnceCell<Arc<Database>> = OnceCell::const_new();
 
 #[derive(Clone)]
