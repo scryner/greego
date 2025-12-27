@@ -19,7 +19,7 @@ tauri-build = { version = "2.5.3", features = [] }
 
 [features]
 default = ["apple"]
-apple = []
+apple = ["ort/coreml"]
 
 
 [dependencies]
@@ -36,6 +36,13 @@ async-trait = "0.1"
 reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"] }
 futures = "0.3"
 async-stream = "0.3"
+fastembed = "5.5.0"
+ort = { version = "2.0.0-rc.9" }
+hf-hub = { version = "0.3", features = ["tokio"] }
+tokenizers = { version = "0.22", default-features = false, features = ["onig"] }
+dirs = "5.0"
+ndarray = "0.16"
+async-openai = { version = "0.32.2", features = ["embedding"] }
 
 [profile.release]
 lto = true
