@@ -1,4 +1,4 @@
-use super::{Embedding, RerankResult, TextEmbedding, TextReranking};
+use crate::embedding::{Embedding, EmbeddingService, RerankResult, TextReranking};
 use async_trait::async_trait;
 use fastembed::{
     EmbeddingModel, InitOptions, RerankInitOptions, RerankerModel,
@@ -43,8 +43,8 @@ impl LocalEmbedding {
 }
 
 #[async_trait]
-impl TextEmbedding for LocalEmbedding {
-    async fn embed(&self, documents: Vec<String>) -> anyhow::Result<Vec<Embedding>> {
+impl EmbeddingService for LocalEmbedding {
+    async fn embed(&self, _model: &str, documents: Vec<String>) -> anyhow::Result<Vec<Embedding>> {
         let model = self.model.clone();
 
         let embeddings = tokio::task::spawn_blocking(move || {
@@ -56,6 +56,10 @@ impl TextEmbedding for LocalEmbedding {
         .await??;
 
         Ok(embeddings)
+    }
+
+    async fn get_available_models(&self) -> anyhow::Result<Option<Vec<String>>> {
+        Ok(Some(vec!["gemma-300m".to_string()]))
     }
 }
 
@@ -134,7 +138,9 @@ mod tests {
         let embedding_provider = LocalEmbedding::new().await?;
 
         let documents = vec!["Hello, world!".to_string(), "Rust is awesome.".to_string()];
-        let embeddings = embedding_provider.embed(documents.clone()).await?;
+        let embeddings = embedding_provider
+            .embed("gemma-300m", documents.clone())
+            .await?;
 
         assert_eq!(embeddings.len(), documents.len());
         for (i, embedding) in embeddings.iter().enumerate() {

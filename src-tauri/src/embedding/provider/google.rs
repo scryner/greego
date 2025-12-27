@@ -1,4 +1,4 @@
-use super::{Embedding, TextEmbedding};
+use crate::embedding::{Embedding, EmbeddingService};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
@@ -6,7 +6,6 @@ const BATCH_SIZE: usize = 100;
 
 pub struct GoogleEmbedding {
     api_key: String,
-    model: String,
     client: reqwest::Client,
 }
 
@@ -14,7 +13,6 @@ impl GoogleEmbedding {
     pub fn new(api_key: String) -> Self {
         Self {
             api_key,
-            model: "models/text-embedding-004".to_string(),
             client: reqwest::Client::new(),
         }
     }
@@ -52,15 +50,15 @@ struct ContentEmbedding {
 }
 
 #[async_trait]
-impl TextEmbedding for GoogleEmbedding {
-    async fn embed(&self, documents: Vec<String>) -> anyhow::Result<Vec<Embedding>> {
+impl EmbeddingService for GoogleEmbedding {
+    async fn embed(&self, model: &str, documents: Vec<String>) -> anyhow::Result<Vec<Embedding>> {
         let mut all_embeddings = Vec::with_capacity(documents.len());
 
         for chunk in documents.chunks(BATCH_SIZE) {
             let requests: Vec<EmbedContentRequest> = chunk
                 .iter()
                 .map(|doc| EmbedContentRequest {
-                    model: self.model.clone(),
+                    model: model.to_string(),
                     content: Content {
                         parts: vec![Part { text: doc.clone() }],
                     },
@@ -71,7 +69,7 @@ impl TextEmbedding for GoogleEmbedding {
 
             let url = format!(
                 "https://generativelanguage.googleapis.com/v1beta/{}:batchEmbedContents?key={}",
-                self.model, self.api_key
+                model, self.api_key
             );
 
             let response = self.client.post(&url).json(&request_body).send().await?;
@@ -89,5 +87,9 @@ impl TextEmbedding for GoogleEmbedding {
         }
 
         Ok(all_embeddings)
+    }
+
+    async fn get_available_models(&self) -> anyhow::Result<Option<Vec<String>>> {
+        Ok(Some(vec!["models/text-embedding-004".to_string()]))
     }
 }
