@@ -59,38 +59,86 @@ pub async fn list_canvas(
     Ok(canvases)
 }
 
-pub async fn add_node(client: &Surreal<Db>, canvas_id: Thing, node: Node) -> anyhow::Result<Node> {
-    log::debug!("add_node: canvas_id={}, node={:?}", canvas_id, node);
+async fn create_node_common(
+    client: &Surreal<Db>,
+    canvas_id: Thing,
+    node: Node,
+    relation: Option<(Thing, &'static str)>,
+    op_name: &str,
+) -> anyhow::Result<Node> {
+    log::debug!(
+        "{}: canvas_id={}, node={:?}, relation_exists={}",
+        op_name,
+        canvas_id,
+        node,
+        relation.is_some()
+    );
 
-    let sql = r#"
-        IF array::len((SELECT * FROM $canvas_id)) == 0 {
+    let (extra_relate_sql, from_id) = match relation {
+        Some((from, edge)) => (
+            format!(
+                "RELATE $from -> {} -> $node_id SET canvas = $canvas_id;",
+                edge
+            ),
+            Some(from),
+        ),
+        None => (String::new(), None),
+    };
+
+    let sql = format!(
+        r#"
+        IF array::len((SELECT * FROM $canvas_id)) == 0 {{
             THROW "Canvas not found";
-        };
+        }};
         let $node = (CREATE node CONTENT $node_data);
         let $node_id = $node[0].id;
         RELATE $canvas_id -> holds -> $node_id;
+        {}
         RETURN $node[0];
-    "#;
+    "#,
+        extra_relate_sql
+    );
 
-    let mut response = client
+    let mut query = client
         .query(sql)
         .bind(("canvas_id", canvas_id))
-        .bind(("node_data", node))
-        .await
-        .inspect_err(|e| log::error!("add_node: query failed: {}", e))?;
+        .bind(("node_data", node));
 
-    let created: Option<Node> = response.take(4).inspect_err(|e| {
+    if let Some(from) = from_id {
+        query = query.bind(("from", from));
+    }
+
+    let response = query
+        .await
+        .inspect_err(|e| log::error!("{}: query failed: {}", op_name, e))?;
+
+    let mut response = response
+        .check()
+        .inspect_err(|e| log::error!("{}: check failed: {}", op_name, e))?;
+
+    let return_idx = if !extra_relate_sql.is_empty() { 5 } else { 4 };
+
+    let created: Option<Node> = response.take(return_idx).inspect_err(|e| {
         log::error!(
-            "add_node: failed to retrieve created node from response: {}",
+            "{}: failed to retrieve created node from response: {}",
+            op_name,
             e
         )
     })?;
     let result = created.ok_or_else(|| {
-        log::error!("add_node: query succeeded but returned no created node");
-        anyhow::anyhow!("Failed to create node")
+        log::error!("{}: query succeeded but returned no created node", op_name);
+        match op_name {
+            "add_derived_node" => anyhow::anyhow!("Failed to create derived node"),
+            "add_sequenced_node" => anyhow::anyhow!("Failed to create sequenced node"),
+            _ => anyhow::anyhow!("Failed to create node"),
+        }
     })?;
-    log::debug!("add_node: success, created={:?}", result);
+    log::debug!("{}: success, created={:?}", op_name, result);
     Ok(result)
+}
+
+pub async fn add_node(client: &Surreal<Db>, canvas_id: Thing, node: Node) -> anyhow::Result<Node> {
+    create_node_common(client, canvas_id, node, None, "add_node").await
 }
 
 pub async fn add_derived_node(
@@ -99,41 +147,14 @@ pub async fn add_derived_node(
     from: Thing,
     to: Node,
 ) -> anyhow::Result<Node> {
-    log::debug!(
-        "add_derived_node: canvas_id={}, from={}, to={:?}",
+    create_node_common(
+        client,
         canvas_id,
-        from,
-        to
-    );
-
-    let sql = r#"
-        IF array::len((SELECT * FROM $canvas_id)) == 0 {
-            THROW "Canvas not found";
-        };
-        let $node = (CREATE node CONTENT $node_data);
-        let $node_id = $node[0].id;
-        RELATE $canvas_id -> holds -> $node_id;
-        RELATE $from -> derives -> $node_id SET canvas = $canvas_id;
-        RETURN $node[0];
-    "#;
-
-    let mut response = client
-        .query(sql)
-        .bind(("canvas_id", canvas_id))
-        .bind(("from", from))
-        .bind(("node_data", to))
-        .await
-        .inspect_err(|e| log::error!("add_derived_node: query failed: {}", e))?;
-
-    let created: Option<Node> = response
-        .take(5)
-        .inspect_err(|e| log::error!("add_derived_node: failed to retrieve created node: {}", e))?;
-    let result = created.ok_or_else(|| {
-        log::error!("add_derived_node: query succeeded but returned no created node");
-        anyhow::anyhow!("Failed to create derived node")
-    })?;
-    log::debug!("add_derived_node: success, created={:?}", result);
-    Ok(result)
+        to,
+        Some((from, "derives")),
+        "add_derived_node",
+    )
+    .await
 }
 
 pub async fn add_sequenced_node(
@@ -142,41 +163,14 @@ pub async fn add_sequenced_node(
     from: Thing,
     to: Node,
 ) -> anyhow::Result<Node> {
-    log::debug!(
-        "add_sequenced_node: canvas_id={}, from={}, to={:?}",
+    create_node_common(
+        client,
         canvas_id,
-        from,
-        to
-    );
-
-    let sql = r#"
-        IF array::len((SELECT * FROM $canvas_id)) == 0 {
-            THROW "Canvas not found";
-        };
-        let $node = (CREATE node CONTENT $node_data);
-        let $node_id = $node[0].id;
-        RELATE $canvas_id -> holds -> $node_id;
-        RELATE $from -> sequences -> $node_id SET canvas = $canvas_id;
-        RETURN $node[0];
-    "#;
-
-    let mut response = client
-        .query(sql)
-        .bind(("canvas_id", canvas_id))
-        .bind(("from", from))
-        .bind(("node_data", to))
-        .await
-        .inspect_err(|e| log::error!("add_sequenced_node: query failed: {}", e))?;
-
-    let created: Option<Node> = response.take(5).inspect_err(|e| {
-        log::error!("add_sequenced_node: failed to retrieve created node: {}", e)
-    })?;
-    let result = created.ok_or_else(|| {
-        log::error!("add_sequenced_node: query succeeded but returned no created node");
-        anyhow::anyhow!("Failed to create sequenced node")
-    })?;
-    log::debug!("add_sequenced_node: success, created={:?}", result);
-    Ok(result)
+        to,
+        Some((from, "sequences")),
+        "add_sequenced_node",
+    )
+    .await
 }
 
 pub async fn move_node_position(
@@ -342,4 +336,231 @@ pub async fn get_node(client: &Surreal<Db>, node_id: Thing) -> anyhow::Result<No
 
     log::debug!("get_node: success, result={:?}", result);
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::schema::{ChatNodeData, NodePosition, NodeType};
+    use crate::llm::{ContentPart, LlmInput, LlmOutput, Message, Role}; // Adjust imports based on actual location
+    use surrealdb::engine::local::Mem;
+    use tauri::Url;
+
+    async fn setup_db() -> Surreal<Db> {
+        let db = Surreal::new::<Mem>(()).await.unwrap();
+        db.use_ns("test").use_db("test").await.unwrap();
+        db
+    }
+
+    fn create_dummy_canvas() -> Canvas {
+        Canvas {
+            id: None,
+            title: "Test Canvas".to_string(),
+            created_at: chrono::Utc::now(),
+            text_embedding_id: None,
+            text_reranker_id: None,
+        }
+    }
+
+    fn create_dummy_node() -> Node {
+        Node {
+            id: None,
+            position: NodePosition { x: 100.0, y: 200.0 },
+            type_: NodeType::Link {
+                url: Url::parse("https://example.com").unwrap(),
+            },
+        }
+    }
+
+    #[tokio::test]
+    async fn test_canvas_lifecycle() {
+        let db = setup_db().await;
+
+        // Test add_canvas
+        let canvas = create_dummy_canvas();
+        let created_canvas = add_canvas(&db, canvas.clone()).await.unwrap();
+        assert!(created_canvas.id.is_some());
+        assert_eq!(created_canvas.title, canvas.title);
+
+        // Test list_canvas
+        let canvases = list_canvas(&db, 10, 0).await.unwrap();
+        assert_eq!(canvases.len(), 1);
+        assert_eq!(canvases[0].id, created_canvas.id);
+
+        let canvas2 = create_dummy_canvas();
+        add_canvas(&db, canvas2).await.unwrap();
+
+        let canvases = list_canvas(&db, 10, 0).await.unwrap();
+        assert_eq!(canvases.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_add_node() {
+        let db = setup_db().await;
+        let canvas = add_canvas(&db, create_dummy_canvas()).await.unwrap();
+        let canvas_id = canvas.id.unwrap();
+
+        let node = create_dummy_node();
+        let created_node = add_node(&db, canvas_id.clone(), node.clone())
+            .await
+            .unwrap();
+
+        assert!(created_node.id.is_some());
+        assert_eq!(created_node.position.x, node.position.x);
+
+        // Verify node is in canvas via load_canvas
+        let (nodes, _, _) = load_canvas(&db, canvas_id).await.unwrap();
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0].id, created_node.id);
+    }
+
+    #[tokio::test]
+    async fn test_add_node_invalid_canvas() {
+        let db = setup_db().await;
+        let fake_canvas_id = Thing::from(("canvas", "nonexistent"));
+        let node = create_dummy_node();
+
+        let result = add_node(&db, fake_canvas_id, node).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Canvas not found"));
+    }
+
+    #[tokio::test]
+    async fn test_node_relations() {
+        let db = setup_db().await;
+        let canvas = add_canvas(&db, create_dummy_canvas()).await.unwrap();
+        let canvas_id = canvas.id.unwrap();
+
+        let node1 = add_node(&db, canvas_id.clone(), create_dummy_node())
+            .await
+            .unwrap();
+        let node1_id = node1.id.unwrap();
+
+        // Test add_derived_node
+        let node2_data = create_dummy_node();
+        let node2 = add_derived_node(&db, canvas_id.clone(), node1_id.clone(), node2_data)
+            .await
+            .unwrap();
+        let node2_id = node2.id.clone().unwrap();
+
+        // Test add_sequenced_node
+        let node3_data = create_dummy_node();
+        let node3 = add_sequenced_node(&db, canvas_id.clone(), node1_id.clone(), node3_data)
+            .await
+            .unwrap();
+        let node3_id = node3.id.unwrap();
+
+        // Verify relations
+        let (nodes, derives, sequences) = load_canvas(&db, canvas_id).await.unwrap();
+        assert_eq!(nodes.len(), 3);
+        assert_eq!(derives.len(), 1);
+        assert_eq!(sequences.len(), 1);
+
+        assert_eq!(derives[0].from, node1_id);
+        assert_eq!(derives[0].to, node2_id);
+
+        assert_eq!(sequences[0].from, node1_id);
+        assert_eq!(sequences[0].to, node3_id);
+    }
+
+    #[tokio::test]
+    async fn test_move_node() {
+        let db = setup_db().await;
+        let canvas = add_canvas(&db, create_dummy_canvas()).await.unwrap();
+        let node = add_node(&db, canvas.id.unwrap(), create_dummy_node())
+            .await
+            .unwrap();
+        let node_id = node.id.unwrap();
+
+        let updated_node = move_node_position(&db, node_id.clone(), 500.0, 600.0)
+            .await
+            .unwrap();
+        assert_eq!(updated_node.position.x, 500.0);
+        assert_eq!(updated_node.position.y, 600.0);
+
+        let fetched_node = get_node(&db, node_id).await.unwrap();
+        assert_eq!(fetched_node.position.x, 500.0);
+        assert_eq!(fetched_node.position.y, 600.0);
+    }
+
+    #[tokio::test]
+    async fn test_delete_node() {
+        let db = setup_db().await;
+        let canvas = add_canvas(&db, create_dummy_canvas()).await.unwrap();
+        let canvas_id = canvas.id.unwrap();
+
+        let node1 = add_node(&db, canvas_id.clone(), create_dummy_node())
+            .await
+            .unwrap();
+        let node1_id = node1.id.clone().unwrap();
+
+        let node2 = add_derived_node(&db, canvas_id, node1_id.clone(), create_dummy_node())
+            .await
+            .unwrap();
+        let node2_id = node2.id.unwrap();
+
+        // Try deleting node1 (parent) - should fail because of reference
+        let result = delete_node(&db, node1_id.clone()).await;
+        assert!(result.is_err());
+
+        // Delete node2 (child) - should succeed
+        let result = delete_node(&db, node2_id.clone()).await;
+        assert!(result.is_ok());
+
+        // Now delete node1 - should succeed
+        let result = delete_node(&db, node1_id.clone()).await;
+        assert!(result.is_ok());
+
+        let fetched = get_node(&db, node1_id).await;
+        assert!(fetched.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_update_chat_node_output() {
+        let db = setup_db().await;
+        let canvas = add_canvas(&db, create_dummy_canvas()).await.unwrap();
+
+        let chat_node_data = ChatNodeData {
+            input: LlmInput {
+                system_prompt: None,
+                history: vec![],
+                user_input: Message::new_text(Role::User, "Hello"),
+            },
+            output: None,
+        };
+
+        let node_data = Node {
+            id: None,
+            position: NodePosition { x: 0.0, y: 0.0 },
+            type_: NodeType::Chat {
+                data: chat_node_data,
+                model_id: None,
+            },
+        };
+
+        let node = add_node(&db, canvas.id.unwrap(), node_data).await.unwrap();
+        let node_id = node.id.unwrap();
+
+        let output = LlmOutput {
+            content: vec![ContentPart::Text("Response".to_string())],
+            usage: None,
+            raw: None,
+        };
+
+        let updated_node = update_chat_node_output(&db, node_id.clone(), output.clone())
+            .await
+            .unwrap();
+
+        match updated_node.type_ {
+            NodeType::Chat { data, .. } => {
+                assert!(data.output.is_some());
+                let out = data.output.unwrap();
+                match out.content[0] {
+                    ContentPart::Text(ref t) => assert_eq!(t, "Response"),
+                    _ => panic!("Unexpected content type"),
+                }
+            }
+            _ => panic!("Unexpected node type"),
+        }
+    }
 }

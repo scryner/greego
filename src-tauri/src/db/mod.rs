@@ -242,10 +242,23 @@ mod tests {
         }
     }
 
+    fn mock_canvas(title: &str) -> Canvas {
+        Canvas {
+            id: None,
+            title: title.to_string(),
+            created_at: chrono::Utc::now(),
+            text_embedding_id: None,
+            text_reranker_id: None,
+        }
+    }
+
     #[tokio::test]
     async fn test_add_node() {
         let db = setup_test_db().await;
-        let canvas_id = Thing::from(("canvas", "test_canvas"));
+        // Create canvas first
+        let canvas = db.add_canvas(mock_canvas("test_canvas")).await.unwrap();
+        let canvas_id = canvas.id.unwrap();
+
         let node = mock_node();
 
         let created = db.add_node(canvas_id.clone(), node).await.unwrap();
@@ -258,7 +271,9 @@ mod tests {
     #[tokio::test]
     async fn test_move_node_position() {
         let db = setup_test_db().await;
-        let canvas_id = Thing::from(("canvas", "test_canvas"));
+        let canvas = db.add_canvas(mock_canvas("test_canvas")).await.unwrap();
+        let canvas_id = canvas.id.unwrap();
+
         let node = db.add_node(canvas_id, mock_node()).await.unwrap();
 
         let updated = db
@@ -271,7 +286,9 @@ mod tests {
     #[tokio::test]
     async fn test_event_optimization() {
         let db = setup_test_db().await;
-        let canvas_id = Thing::from(("canvas", "opt_test"));
+        let canvas = db.add_canvas(mock_canvas("opt_test")).await.unwrap();
+        let canvas_id = canvas.id.unwrap();
+
         let node = db.add_node(canvas_id, mock_node()).await.unwrap();
         let _node_id = node.id.unwrap();
 
@@ -281,7 +298,9 @@ mod tests {
     async fn test_load_canvas_after_add_node() {
         let db = setup_test_db().await;
         // Use a clean canvas ID
-        let canvas_id = Thing::from(("canvas", "test_load"));
+        let canvas = db.add_canvas(mock_canvas("test_load")).await.unwrap();
+        let canvas_id = canvas.id.unwrap();
+
         let node = mock_node();
 
         let created_node = db.add_node(canvas_id.clone(), node).await.unwrap();

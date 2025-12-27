@@ -251,10 +251,23 @@ mod tests {
         }
     }
 
+    async fn create_test_canvas(client: &Surreal<Db>, name: &str) -> Thing {
+        use crate::db::schema::Canvas;
+        let canvas = Canvas {
+            id: None,
+            title: name.to_string(),
+            created_at: chrono::Utc::now(),
+            text_embedding_id: None,
+            text_reranker_id: None,
+        };
+        let created = operation::add_canvas(client, canvas).await.unwrap();
+        created.id.unwrap()
+    }
+
     #[tokio::test]
     async fn test_event_loop_add_node() {
         let (client, sender, _err_rx, _handle) = setup_test_context().await;
-        let canvas_id = Thing::from(("canvas", "test"));
+        let canvas_id = create_test_canvas(&client, "test").await;
         let (tx, rx) = oneshot::channel();
 
         sender
@@ -280,7 +293,7 @@ mod tests {
     #[tokio::test]
     async fn test_event_loop_add_derived_node() {
         let (client, sender, _err_rx, _handle) = setup_test_context().await;
-        let canvas_id = Thing::from(("canvas", "test"));
+        let canvas_id = create_test_canvas(&client, "test").await;
 
         // Add root node
         let (tx1, rx1) = oneshot::channel();
@@ -319,7 +332,7 @@ mod tests {
     #[tokio::test]
     async fn test_event_loop_add_sequenced_node() {
         let (client, sender, _err_rx, _handle) = setup_test_context().await;
-        let canvas_id = Thing::from(("canvas", "test"));
+        let canvas_id = create_test_canvas(&client, "test").await;
 
         // Add root node
         let (tx1, rx1) = oneshot::channel();
@@ -358,7 +371,7 @@ mod tests {
     #[tokio::test]
     async fn test_event_loop_move_node_coalescing() {
         let (client, sender, _err_rx, _handle) = setup_test_context().await;
-        let canvas_id = Thing::from(("canvas", "test"));
+        let canvas_id = create_test_canvas(&client, "test").await;
 
         // Add node
         let (tx, rx) = oneshot::channel();
@@ -412,7 +425,7 @@ mod tests {
     #[tokio::test]
     async fn test_event_loop_delete_node() {
         let (client, sender, _err_rx, _handle) = setup_test_context().await;
-        let canvas_id = Thing::from(("canvas", "test"));
+        let canvas_id = create_test_canvas(&client, "test").await;
 
         // Add node
         let (tx1, rx1) = oneshot::channel();
@@ -444,8 +457,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_macro_event_flow() {
-        let (_client, sender, _err_rx, _handle) = setup_test_context().await;
-        let canvas_id = Thing::from(("canvas", "macro_test"));
+        let (client, sender, _err_rx, _handle) = setup_test_context().await;
+        let canvas_id = create_test_canvas(&client, "macro_test").await;
 
         // 1. Add root
         let (tx, rx) = oneshot::channel();
