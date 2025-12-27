@@ -1,12 +1,42 @@
-use crate::db::schema::{Derives, Node, Sequences};
+use crate::db::schema::{Canvas, Derives, Node, Sequences};
 use surrealdb::engine::local::Db;
 use surrealdb::sql::Thing;
 use surrealdb::Surreal;
+
+pub async fn add_canvas(client: &Surreal<Db>, canvas: Canvas) -> anyhow::Result<Canvas> {
+    log::debug!("add_canvas: canvas={:?}", canvas);
+
+    let sql = r#"
+        CREATE canvas CONTENT $canvas_data;
+    "#;
+
+    let mut response = client
+        .query(sql)
+        .bind(("canvas_data", canvas))
+        .await
+        .inspect_err(|e| log::error!("add_canvas: query failed: {}", e))?;
+
+    let created: Option<Canvas> = response.take(0).inspect_err(|e| {
+        log::error!(
+            "add_canvas: failed to retrieve created canvas from response: {}",
+            e
+        )
+    })?;
+    let result = created.ok_or_else(|| {
+        log::error!("add_canvas: query succeeded but returned no created canvas");
+        anyhow::anyhow!("Failed to create canvas")
+    })?;
+    log::debug!("add_canvas: success, created={:?}", result);
+    Ok(result)
+}
 
 pub async fn add_node(client: &Surreal<Db>, canvas_id: Thing, node: Node) -> anyhow::Result<Node> {
     log::debug!("add_node: canvas_id={}, node={:?}", canvas_id, node);
 
     let sql = r#"
+        IF array::len((SELECT * FROM $canvas_id)) == 0 {
+            THROW "Canvas not found";
+        };
         let $node = (CREATE node CONTENT $node_data);
         let $node_id = $node[0].id;
         RELATE $canvas_id -> holds -> $node_id;
@@ -20,7 +50,7 @@ pub async fn add_node(client: &Surreal<Db>, canvas_id: Thing, node: Node) -> any
         .await
         .inspect_err(|e| log::error!("add_node: query failed: {}", e))?;
 
-    let created: Option<Node> = response.take(3).inspect_err(|e| {
+    let created: Option<Node> = response.take(4).inspect_err(|e| {
         log::error!(
             "add_node: failed to retrieve created node from response: {}",
             e
@@ -48,6 +78,9 @@ pub async fn add_derived_node(
     );
 
     let sql = r#"
+        IF array::len((SELECT * FROM $canvas_id)) == 0 {
+            THROW "Canvas not found";
+        };
         let $node = (CREATE node CONTENT $node_data);
         let $node_id = $node[0].id;
         RELATE $canvas_id -> holds -> $node_id;
@@ -64,7 +97,7 @@ pub async fn add_derived_node(
         .inspect_err(|e| log::error!("add_derived_node: query failed: {}", e))?;
 
     let created: Option<Node> = response
-        .take(4)
+        .take(5)
         .inspect_err(|e| log::error!("add_derived_node: failed to retrieve created node: {}", e))?;
     let result = created.ok_or_else(|| {
         log::error!("add_derived_node: query succeeded but returned no created node");
@@ -88,6 +121,9 @@ pub async fn add_sequenced_node(
     );
 
     let sql = r#"
+        IF array::len((SELECT * FROM $canvas_id)) == 0 {
+            THROW "Canvas not found";
+        };
         let $node = (CREATE node CONTENT $node_data);
         let $node_id = $node[0].id;
         RELATE $canvas_id -> holds -> $node_id;
@@ -103,7 +139,7 @@ pub async fn add_sequenced_node(
         .await
         .inspect_err(|e| log::error!("add_sequenced_node: query failed: {}", e))?;
 
-    let created: Option<Node> = response.take(4).inspect_err(|e| {
+    let created: Option<Node> = response.take(5).inspect_err(|e| {
         log::error!("add_sequenced_node: failed to retrieve created node: {}", e)
     })?;
     let result = created.ok_or_else(|| {

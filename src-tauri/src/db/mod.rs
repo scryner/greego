@@ -1,6 +1,6 @@
 use crate::db::event_loop::EventLoop;
 use crate::db::events::DbEvent;
-use crate::db::schema::{Derives, Node, Sequences};
+use crate::db::schema::{Canvas, Derives, Node, Sequences};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -91,6 +91,16 @@ impl Database {
         canvas_id: Thing,
     ) -> anyhow::Result<(Vec<Node>, Vec<Derives>, Vec<Sequences>)> {
         operation::load_canvas(&self.client, canvas_id).await
+    }
+
+    pub async fn add_canvas(&self, canvas: Canvas) -> anyhow::Result<Canvas> {
+        let (tx, rx) = oneshot::channel();
+        let event = DbEvent::AddCanvas {
+            canvas,
+            response: tx,
+        };
+        self.sender.send(event).await.expect("Event loop closed");
+        rx.await.expect("Response dropped")
     }
 
     pub async fn add_node(&self, canvas_id: Thing, node: Node) -> anyhow::Result<Node> {

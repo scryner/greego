@@ -1,4 +1,4 @@
-use crate::db::schema::{Derives, Node, Sequences};
+use crate::db::schema::{Canvas, Derives, Node, Sequences};
 use crate::db::Database;
 // use crate::llm::LlmService; // Removed
 use crate::llm::LlmServiceManager; // Added
@@ -31,6 +31,14 @@ pub async fn delete_node_command(
         .ok_or("Invalid ID format. Expected 'table:id'")?;
     let thing = surrealdb::sql::Thing::from((tb.to_string(), id_str.to_string()));
     state.delete_node(thing).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn add_canvas_command(
+    state: State<'_, Database>,
+    canvas: Canvas,
+) -> Result<Canvas, String> {
+    state.add_canvas(canvas).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]

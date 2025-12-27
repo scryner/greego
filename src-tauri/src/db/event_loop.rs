@@ -129,6 +129,11 @@ impl EventLoop {
     async fn execute_event(&self, event: DbEvent) {
         log::debug!("execute_event: processing event");
         match event {
+            DbEvent::AddCanvas { canvas, response } => {
+                let res = operation::add_canvas(&self.client, canvas).await;
+                self.report_error_if_any(&res).await;
+                let _ = response.send(res);
+            }
             DbEvent::AddNode {
                 canvas_id,
                 node,

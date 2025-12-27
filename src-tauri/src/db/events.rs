@@ -1,8 +1,12 @@
-use crate::db::schema::Node;
+use crate::db::schema::{Canvas, Node};
 use surrealdb::sql::Thing;
 use tokio::sync::oneshot;
 
 pub enum DbEvent {
+    AddCanvas {
+        canvas: Canvas,
+        response: oneshot::Sender<anyhow::Result<Canvas>>,
+    },
     AddNode {
         canvas_id: Thing,
         node: Node,
