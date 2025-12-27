@@ -208,9 +208,7 @@ impl LlmService for AnthropicService {
                         continue;
                     }
 
-                    if line_content.starts_with("data: ") {
-                         let data = &line_content["data: ".len()..];
-
+                    if let Some(data) = line_content.strip_prefix("data: ") {
                          if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
                              if let Some(event_type) = json.get("type").and_then(|t| t.as_str()) {
                                  match event_type {

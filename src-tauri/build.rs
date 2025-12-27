@@ -25,7 +25,7 @@ fn main() {
 
         if status.is_ok() {
             let status = Command::new("swiftc")
-                .args(&[
+                .args([
                     "-emit-library",
                     "-static",
                     "-module-name",

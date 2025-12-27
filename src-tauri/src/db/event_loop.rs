@@ -134,6 +134,15 @@ impl EventLoop {
                 self.report_error_if_any(&res).await;
                 let _ = response.send(res);
             }
+            DbEvent::ListCanvas {
+                limit,
+                offset,
+                response,
+            } => {
+                let res = operation::list_canvas(&self.client, limit, offset).await;
+                self.report_error_if_any(&res).await;
+                let _ = response.send(res);
+            }
             DbEvent::AddNode {
                 canvas_id,
                 node,

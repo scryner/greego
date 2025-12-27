@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use crate::llm::{LlmInput, LlmOutput};
-
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use surrealdb::sql::Thing;
 use tauri::Url;
@@ -11,6 +11,7 @@ pub struct Canvas {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<Thing>,
     pub title: String,
+    pub created_at: DateTime<Utc>,
     pub text_embedding_id: Option<String>,
     pub text_reranker_id: Option<String>,
 }

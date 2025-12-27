@@ -50,6 +50,12 @@ pub struct AppleService {
     // Let's create a session per request for simplicity and correctness with system prompts.
 }
 
+impl Default for AppleService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AppleService {
     pub fn new() -> Self {
         unsafe {

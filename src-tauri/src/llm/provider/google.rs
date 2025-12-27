@@ -209,8 +209,7 @@ impl LlmService for GoogleService {
                         continue;
                     }
 
-                    if line_content.starts_with("data: ") {
-                        let data = &line_content["data: ".len()..];
+                    if let Some(data) = line_content.strip_prefix("data: ") {
                         if data == "[DONE]" {
                             break;
                         }

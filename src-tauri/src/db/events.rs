@@ -7,6 +7,11 @@ pub enum DbEvent {
         canvas: Canvas,
         response: oneshot::Sender<anyhow::Result<Canvas>>,
     },
+    ListCanvas {
+        limit: usize,
+        offset: usize,
+        response: oneshot::Sender<anyhow::Result<Vec<Canvas>>>,
+    },
     AddNode {
         canvas_id: Thing,
         node: Node,

@@ -42,6 +42,18 @@ pub async fn add_canvas_command(
 }
 
 #[tauri::command]
+pub async fn list_canvas_command(
+    state: State<'_, Database>,
+    limit: Option<usize>,
+    offset: Option<usize>,
+) -> Result<Vec<Canvas>, String> {
+    state
+        .list_canvas(limit.unwrap_or(10), offset.unwrap_or(0))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn add_node_command(
     state: State<'_, Database>,
     canvas_id: String,

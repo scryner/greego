@@ -48,6 +48,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::add_node_command,
+            commands::add_canvas_command,  // Register the new command
+            commands::list_canvas_command, // Register the list command
             commands::add_derived_node_command,
             commands::add_sequenced_node_command,
             commands::move_node_position_command,

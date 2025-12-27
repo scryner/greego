@@ -43,6 +43,7 @@ tokenizers = { version = "0.22", default-features = false, features = ["onig"] }
 dirs = "5.0"
 ndarray = "0.16"
 async-openai = { version = "0.32.2", features = ["embedding"] }
+chrono = { version = "0.4.42", features = ["serde"] }
 
 [profile.release]
 lto = true

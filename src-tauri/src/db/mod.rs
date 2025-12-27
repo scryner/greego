@@ -103,6 +103,17 @@ impl Database {
         rx.await.expect("Response dropped")
     }
 
+    pub async fn list_canvas(&self, limit: usize, offset: usize) -> anyhow::Result<Vec<Canvas>> {
+        let (tx, rx) = oneshot::channel();
+        let event = DbEvent::ListCanvas {
+            limit,
+            offset,
+            response: tx,
+        };
+        self.sender.send(event).await.expect("Event loop closed");
+        rx.await.expect("Response dropped")
+    }
+
     pub async fn add_node(&self, canvas_id: Thing, node: Node) -> anyhow::Result<Node> {
         let (tx, rx) = oneshot::channel();
         let event = DbEvent::AddNode {

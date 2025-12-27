@@ -97,6 +97,12 @@ pub struct LlmServiceManager {
     services: HashMap<String, Box<dyn LlmService>>,
 }
 
+impl Default for LlmServiceManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LlmServiceManager {
     pub fn new() -> Self {
         let mut services: HashMap<String, Box<dyn LlmService>> = HashMap::new();
@@ -163,7 +169,7 @@ impl LlmServiceManager {
             .services
             .get(service_name)
             .ok_or(anyhow!("Service not found"))?;
-        service.chat_completion(&model_name, input).await
+        service.chat_completion(model_name, input).await
     }
 
     pub async fn chat_stream(
@@ -183,7 +189,7 @@ impl LlmServiceManager {
             .services
             .get(service_name)
             .ok_or(anyhow!("Service not found"))?;
-        service.chat_stream(&model_name, input).await
+        service.chat_stream(model_name, input).await
     }
 }
 

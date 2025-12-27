@@ -30,6 +30,35 @@ pub async fn add_canvas(client: &Surreal<Db>, canvas: Canvas) -> anyhow::Result<
     Ok(result)
 }
 
+pub async fn list_canvas(
+    client: &Surreal<Db>,
+    limit: usize,
+    offset: usize,
+) -> anyhow::Result<Vec<Canvas>> {
+    log::debug!("list_canvas: limit={}, offset={}", limit, offset);
+
+    let sql = r#"
+        SELECT * FROM canvas ORDER BY created_at DESC LIMIT $limit START $offset;
+    "#;
+
+    let mut response = client
+        .query(sql)
+        .bind(("limit", limit))
+        .bind(("offset", offset))
+        .await
+        .inspect_err(|e| log::error!("list_canvas: query failed: {}", e))?;
+
+    let canvases: Vec<Canvas> = response.take(0).inspect_err(|e| {
+        log::error!(
+            "list_canvas: failed to retrieve canvases from response: {}",
+            e
+        )
+    })?;
+
+    log::debug!("list_canvas: success, count={}", canvases.len());
+    Ok(canvases)
+}
+
 pub async fn add_node(client: &Surreal<Db>, canvas_id: Thing, node: Node) -> anyhow::Result<Node> {
     log::debug!("add_node: canvas_id={}, node={:?}", canvas_id, node);
 
