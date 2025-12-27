@@ -44,6 +44,7 @@ dirs = "5.0"
 ndarray = "0.16"
 async-openai = { version = "0.32.2", features = ["embedding"] }
 chrono = { version = "0.4.42", features = ["serde"] }
+regex = "1.12.2"
 
 [profile.release]
 lto = true

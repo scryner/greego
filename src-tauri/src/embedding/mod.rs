@@ -1,3 +1,4 @@
+pub mod chunking;
 pub mod provider;
 
 use anyhow::Result;
