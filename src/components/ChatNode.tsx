@@ -5,7 +5,7 @@ import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 export type ChatNodeData = {
     title?: string;
     content: string;
-    selectedModel?: string;
+    modelId?: string;
     footer?: ReactNode;
     headerClassName?: string;
     containerClassName?: string;

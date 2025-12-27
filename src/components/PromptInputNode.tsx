@@ -7,7 +7,7 @@ export type PromptInputNodeData = {
     title?: string;
     parentId?: string;
     relationType?: 'sequence' | 'derive';
-    selectedModel?: string; // Add selectedModel
+    modelId?: string; // Add modelId
     onModelSelect?: (model: string) => void; // Add callback
     footer?: ReactNode;
     headerClassName?: string;
@@ -36,7 +36,7 @@ export const PromptInputNode = ({ id, data }: NodeProps<PromptInputNodeType>) =>
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
     // Model selection state
-    const [selectedModel, setSelectedModel] = useState<string>(data.selectedModel || "");
+    const [selectedModel, setSelectedModel] = useState<string>(data.modelId || "");
     const [availableModels, setAvailableModels] = useState<string[]>([]);
     const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
 
@@ -52,8 +52,8 @@ export const PromptInputNode = ({ id, data }: NodeProps<PromptInputNodeType>) =>
     // Effect: Inherit model from upstream node on mount or connection change
     useEffect(() => {
         if (connections.length > 0) {
-            if (upstreamNodeData?.selectedModel) {
-                setSelectedModel(upstreamNodeData.selectedModel);
+            if (upstreamNodeData?.modelId) {
+                setSelectedModel(upstreamNodeData.modelId);
             }
         } else {
             // No upstream connection -> Keep existing or default?
@@ -61,11 +61,11 @@ export const PromptInputNode = ({ id, data }: NodeProps<PromptInputNodeType>) =>
             // But if we initialized from data.selectedModel, we might want to keep it.
             // For now, let's only set to empty if we truly have no model.
             // Actually, if there is no connection, we generally want "Select model".
-            if (!data.selectedModel) {
+            if (!data.modelId) {
                 setSelectedModel("");
             }
         }
-    }, [connections.length, upstreamNodeData, data.selectedModel]);
+    }, [connections.length, upstreamNodeData, data.modelId]);
 
     const handleModelSelectorClick = async () => {
         if (!isModelSelectorOpen) {

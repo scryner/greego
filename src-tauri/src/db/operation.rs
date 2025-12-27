@@ -527,6 +527,7 @@ mod tests {
                 user_input: Message::new_text(Role::User, "Hello"),
             },
             output: None,
+            model_id: None,
         };
 
         let node_data = Node {
@@ -534,7 +535,7 @@ mod tests {
             position: NodePosition { x: 0.0, y: 0.0 },
             type_: NodeType::Chat {
                 data: chat_node_data,
-                model_id: None,
+                embedding: None,
             },
         };
 

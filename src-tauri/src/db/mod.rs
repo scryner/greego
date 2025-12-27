@@ -236,8 +236,9 @@ mod tests {
                 data: crate::db::schema::ChatNodeData {
                     input,
                     output: None,
+                    model_id: None,
                 },
-                model_id: None,
+                embedding: None,
             },
         }
     }

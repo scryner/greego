@@ -155,7 +155,7 @@ export const CanvasBoard = () => {
             const nodeData = tempNode?.data as any;
             const parentId = nodeData?.parentId;
             const relationType = nodeData?.relationType;
-            const selectedModel = nodeData?.selectedModel || "";
+            const selectedModel = nodeData?.modelId || "";
 
             // Invoke backend
             const canvasId = "canvas:main";
@@ -275,7 +275,7 @@ export const CanvasBoard = () => {
             data: {
                 content: content,
                 title: title,
-                selectedModel: variantContent?.model_id,
+                modelId: chatNodeData?.model_id,
                 onDelete: handleDeleteNode,
                 onAddNode: (direction) => handleAddNodeAtDirection(nodeId, direction),
                 handles: {
@@ -361,7 +361,7 @@ export const CanvasBoard = () => {
                     ...node,
                     data: {
                         ...node.data,
-                        selectedModel: model
+                        modelId: model
                     }
                 };
             }
@@ -384,7 +384,7 @@ export const CanvasBoard = () => {
             type: 'promptInputNode',
             data: {
                 title: 'New chat',
-                selectedModel: defaultModel,
+                modelId: defaultModel,
                 footer: (
                     <ModelSelector
                         currentModel={defaultModel}
@@ -443,7 +443,7 @@ export const CanvasBoard = () => {
         }
 
         // Inherit model from parent, or use default
-        const parentModel = (parentNode.data as any).selectedModel;
+        const parentModel = (parentNode.data as any).modelId;
         const defaultModel = parentModel || "";
 
         const newNode: PromptInputNodeType = {
@@ -454,7 +454,7 @@ export const CanvasBoard = () => {
                 title: 'New chat',
                 parentId: nodeId, // Store parent ID
                 relationType: relationType, // Store relation type
-                selectedModel: defaultModel,
+                modelId: defaultModel,
                 footer: (
                     <ModelSelector
                         currentModel={defaultModel}

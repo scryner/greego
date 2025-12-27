@@ -24,8 +24,16 @@ pub struct NodePosition {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatNodeData {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_id: Option<String>,
     pub input: LlmInput,
     pub output: Option<LlmOutput>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatNodeEmbedding {
+    pub embedding_id: String,
+    pub embedding: Vec<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,8 +41,7 @@ pub struct ChatNodeData {
 pub enum NodeType {
     Chat {
         data: ChatNodeData,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        model_id: Option<String>,
+        embedding: Option<ChatNodeEmbedding>,
     },
     Link {
         url: Url,
