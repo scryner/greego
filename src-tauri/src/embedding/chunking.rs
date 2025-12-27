@@ -12,11 +12,7 @@ impl SemanticChunking {
         Self { model, threshold }
     }
 
-    pub async fn chunk<S: EmbeddingService + ?Sized>(
-        &self,
-        text: &str,
-        service: &S,
-    ) -> Result<Vec<String>> {
+    pub async fn chunk(&self, text: &str, service: &dyn EmbeddingService) -> Result<Vec<String>> {
         let sentences = self.split_sentences(text);
         if sentences.is_empty() {
             return Ok(vec![]);

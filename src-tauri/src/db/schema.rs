@@ -33,7 +33,7 @@ pub struct ChatNodeData {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatNodeEmbedding {
     pub embedding_id: String,
-    pub embedding: Vec<f32>,
+    pub chunks: Vec<Vec<f32>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

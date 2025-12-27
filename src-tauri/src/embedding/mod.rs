@@ -82,6 +82,9 @@ impl EmbeddingServiceManager {
             .ok_or(anyhow::anyhow!("Service not found"))?;
         service.embed(model_name, documents).await
     }
+    pub fn get_service(&self, name: &str) -> Option<&Box<dyn EmbeddingService>> {
+        self.services.get(name)
+    }
 }
 
 #[derive(Debug, Clone)]

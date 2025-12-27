@@ -1,12 +1,10 @@
 use crate::db::schema::{Canvas, Derives, Node, Sequences};
 use crate::db::schema::{ChatNodeEmbedding, NodeType};
-use crate::embedding::EmbeddingServiceManager;
+use crate::embedding::EmbeddingService; // Changed from EmbeddingServiceManager
 use crate::llm::ContentPart;
-use std::sync::Arc;
 use surrealdb::engine::local::Db;
 use surrealdb::sql::Thing;
 use surrealdb::Surreal;
-use tokio::sync::RwLock;
 
 pub async fn add_canvas(client: &Surreal<Db>, canvas: Canvas) -> anyhow::Result<Canvas> {
     log::debug!("add_canvas: canvas={:?}", canvas);
@@ -66,7 +64,7 @@ pub async fn list_canvas(
 
 async fn create_node_common(
     client: &Surreal<Db>,
-    embedding_manager: Option<&Arc<RwLock<EmbeddingServiceManager>>>,
+    embedding_service: Option<&dyn EmbeddingService>,
     canvas_id: Thing,
     mut node: Node,
     relation: Option<(Thing, &'static str)>,
@@ -81,7 +79,6 @@ async fn create_node_common(
     );
 
     // 1. Fetch Canvas to check embedding_id and inject element
-    // 1. Fetch Canvas to check embedding_id and inject element
     let sql_canvas = "SELECT * FROM $id";
     let response_canvas = client
         .query(sql_canvas)
@@ -95,40 +92,55 @@ async fn create_node_common(
             if let NodeType::Chat { data, embedding } = &mut node.type_ {
                 // Only generate embedding if it doesn't exist yet (though usually it doesn't on creation)
                 if embedding.is_none() {
-                    if let Some(manager_arc) = embedding_manager {
-                        let manager = manager_arc.read().await;
-
-                        // Extract text from user input
-                        let mut text = String::new();
-                        for part in &data.input.user_input.content {
-                            match part {
-                                ContentPart::Text(t) => text.push_str(t),
-                                _ => {}
+                    if let Some(service) = embedding_service {
+                        // Extract text from LLM output (not user input)
+                        // Only proceed if output exists
+                        if let Some(output) = &data.output {
+                            let mut text = String::new();
+                            for part in &output.content {
+                                match part {
+                                    ContentPart::Text(t) => text.push_str(t),
+                                    _ => {}
+                                }
                             }
-                        }
 
-                        if !text.is_empty() {
-                            // Use embedding_id as service name.
-                            // Pass "default" as model name if we don't know it, or maybe use embedding_id as model too?
-                            // Based on user "embedding_id is local, google, openai", it matches service name.
-                            // We'll use "default" for model name for now as Local ignores it.
-                            let embeddings = manager
-                                .embed(&embedding_id, "default", vec![text])
-                                .await
-                                .map_err(|e| {
-                                    anyhow::anyhow!("Failed to generate embedding: {}", e)
-                                })?;
+                            if !text.is_empty() {
+                                // 1. Semantic Chunking
+                                use crate::embedding::chunking::SemanticChunking;
+                                let chunker = SemanticChunking::new("default".to_string(), 0.8);
 
-                            if let Some(emb) = embeddings.first() {
-                                *embedding = Some(ChatNodeEmbedding {
-                                    embedding_id: embedding_id.clone(),
-                                    embedding: emb.clone(),
-                                });
+                                match chunker.chunk(&text, service).await {
+                                    Ok(chunks) => {
+                                        if !chunks.is_empty() {
+                                            // 2. Generate embeddings for chunks
+                                            let embeddings_result =
+                                                service.embed("default", chunks.clone()).await;
+
+                                            match embeddings_result {
+                                                Ok(embeddings) => {
+                                                    *embedding = Some(ChatNodeEmbedding {
+                                                        embedding_id: embedding_id.clone(),
+                                                        chunks: embeddings,
+                                                    });
+                                                }
+                                                Err(e) => {
+                                                    log::error!(
+                                                        "Failed to generate embeddings for chunks: {}",
+                                                        e
+                                                    );
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        log::error!("Failed to chunk text: {}", e);
+                                    }
+                                }
                             }
                         }
                     } else {
                         return Err(anyhow::anyhow!(
-                            "Embedding service manager not provided but canvas requires embedding"
+                            "Embedding service not provided but canvas requires embedding"
                         ));
                     }
                 }
@@ -201,23 +213,23 @@ async fn create_node_common(
 
 pub async fn add_node(
     client: &Surreal<Db>,
-    embedding_manager: Option<&Arc<RwLock<EmbeddingServiceManager>>>,
+    embedding_service: Option<&dyn EmbeddingService>,
     canvas_id: Thing,
     node: Node,
 ) -> anyhow::Result<Node> {
-    create_node_common(client, embedding_manager, canvas_id, node, None, "add_node").await
+    create_node_common(client, embedding_service, canvas_id, node, None, "add_node").await
 }
 
 pub async fn add_derived_node(
     client: &Surreal<Db>,
-    embedding_manager: Option<&Arc<RwLock<EmbeddingServiceManager>>>,
+    embedding_service: Option<&dyn EmbeddingService>,
     canvas_id: Thing,
     from: Thing,
     to: Node,
 ) -> anyhow::Result<Node> {
     create_node_common(
         client,
-        embedding_manager,
+        embedding_service,
         canvas_id,
         to,
         Some((from, "derives")),
@@ -228,14 +240,14 @@ pub async fn add_derived_node(
 
 pub async fn add_sequenced_node(
     client: &Surreal<Db>,
-    embedding_manager: Option<&Arc<RwLock<EmbeddingServiceManager>>>,
+    embedding_service: Option<&dyn EmbeddingService>,
     canvas_id: Thing,
     from: Thing,
     to: Node,
 ) -> anyhow::Result<Node> {
     create_node_common(
         client,
-        embedding_manager,
+        embedding_service,
         canvas_id,
         to,
         Some((from, "sequences")),
@@ -413,9 +425,12 @@ pub async fn get_node(client: &Surreal<Db>, node_id: Thing) -> anyhow::Result<No
 mod tests {
     use super::*;
     use crate::db::schema::{ChatNodeData, NodePosition, NodeType};
-    use crate::llm::{ContentPart, LlmInput, LlmOutput, Message, Role}; // Adjust imports based on actual location
+    use crate::embedding::EmbeddingServiceManager;
+    use crate::llm::{ContentPart, LlmInput, LlmOutput, Message, Role};
+    use std::sync::Arc;
     use surrealdb::engine::local::Mem;
     use tauri::Url;
+    use tokio::sync::RwLock;
 
     async fn setup_db() -> Surreal<Db> {
         let db = Surreal::new::<Mem>(()).await.unwrap();
@@ -668,7 +683,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
+
     async fn test_add_node_with_embedding() {
         use crate::embedding::provider::local::LocalEmbedding;
 
@@ -694,8 +709,21 @@ mod tests {
         println!("Canvas created with embedding_id='local': {:?}", canvas_id);
 
         // 3. Add Chat Node
-        let node_data = create_dummy_chat_node();
-        let created_node = add_node(&db, Some(&manager_arc), canvas_id.clone(), node_data)
+        // Need to provide output for embedding generation now
+        let mut node_data = create_dummy_chat_node();
+        if let NodeType::Chat { data, .. } = &mut node_data.type_ {
+            data.output = Some(LlmOutput {
+                content: vec![ContentPart::Text(
+                    "This is the response that will be chunked and embedded.".to_string(),
+                )],
+                usage: None,
+                raw: None,
+            });
+        }
+
+        let mg = manager_arc.read().await;
+        let service = mg.get_service("local").unwrap();
+        let created_node = add_node(&db, Some(service.as_ref()), canvas_id.clone(), node_data)
             .await
             .unwrap();
         println!("Chat Node created: {:?}", created_node);
@@ -706,17 +734,11 @@ mod tests {
                 assert!(embedding.is_some());
                 let emb = embedding.unwrap();
                 assert_eq!(emb.embedding_id, "local");
-                assert!(!emb.embedding.is_empty());
-                assert_eq!(emb.embedding_id, "local");
-                assert!(!emb.embedding.is_empty());
-                assert!(emb.embedding.len() > 0);
+                assert!(!emb.chunks.is_empty());
+                assert!(emb.chunks[0].len() > 0);
                 println!("Embedding verification successful.");
                 println!("Embedding ID: {}", emb.embedding_id);
-                println!("Embedding Length: {}", emb.embedding.len());
-                println!(
-                    "Embedding Vector (first 5): {:?}",
-                    &emb.embedding[..5.min(emb.embedding.len())]
-                );
+                println!("Chunks Count: {}", emb.chunks.len());
             }
             _ => panic!("Expected Chat node"),
         }

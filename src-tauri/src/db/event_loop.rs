@@ -5,6 +5,7 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 use surrealdb::engine::local::Db;
+use surrealdb::sql::Thing;
 use surrealdb::Surreal;
 use tokio::sync::{mpsc, RwLock};
 use tokio::time::{interval, Interval};
@@ -130,6 +131,17 @@ impl EventLoop {
         }
     }
 
+    async fn get_embedding_id(&self, canvas_id: &Thing) -> Option<String> {
+        let mut response = self
+            .client
+            .query("SELECT embedding_id FROM $id")
+            .bind(("id", canvas_id.clone()))
+            .await
+            .ok()?;
+        let canvas: Option<crate::db::schema::Canvas> = response.take(0).ok()?;
+        canvas?.embedding_id
+    }
+
     async fn execute_event(&self, event: DbEvent) {
         log::debug!("execute_event: processing event");
         match event {
@@ -152,13 +164,13 @@ impl EventLoop {
                 node,
                 response,
             } => {
-                let res = operation::add_node(
-                    &self.client,
-                    Some(&self.embedding_manager),
-                    canvas_id,
-                    node,
-                )
-                .await;
+                let embedding_id = self.get_embedding_id(&canvas_id).await;
+                let manager = self.embedding_manager.read().await;
+                let service = embedding_id
+                    .as_deref()
+                    .and_then(|id| manager.get_service(id).map(|s| s.as_ref()));
+
+                let res = operation::add_node(&self.client, service, canvas_id, node).await;
                 self.report_error_if_any(&res).await;
                 let _ = response.send(res);
             }
@@ -168,14 +180,14 @@ impl EventLoop {
                 to,
                 response,
             } => {
-                let res = operation::add_derived_node(
-                    &self.client,
-                    Some(&self.embedding_manager),
-                    canvas_id,
-                    from,
-                    to,
-                )
-                .await;
+                let embedding_id = self.get_embedding_id(&canvas_id).await;
+                let manager = self.embedding_manager.read().await;
+                let service = embedding_id
+                    .as_deref()
+                    .and_then(|id| manager.get_service(id).map(|s| s.as_ref()));
+
+                let res =
+                    operation::add_derived_node(&self.client, service, canvas_id, from, to).await;
                 self.report_error_if_any(&res).await;
                 let _ = response.send(res);
             }
@@ -185,14 +197,14 @@ impl EventLoop {
                 to,
                 response,
             } => {
-                let res = operation::add_sequenced_node(
-                    &self.client,
-                    Some(&self.embedding_manager),
-                    canvas_id,
-                    from,
-                    to,
-                )
-                .await;
+                let embedding_id = self.get_embedding_id(&canvas_id).await;
+                let manager = self.embedding_manager.read().await;
+                let service = embedding_id
+                    .as_deref()
+                    .and_then(|id| manager.get_service(id).map(|s| s.as_ref()));
+
+                let res =
+                    operation::add_sequenced_node(&self.client, service, canvas_id, from, to).await;
                 self.report_error_if_any(&res).await;
                 let _ = response.send(res);
             }
