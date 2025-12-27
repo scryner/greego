@@ -1,7 +1,12 @@
 use crate::db::schema::{Canvas, Derives, Node, Sequences};
+use crate::db::schema::{ChatNodeEmbedding, NodeType};
+use crate::embedding::EmbeddingServiceManager;
+use crate::llm::ContentPart;
+use std::sync::Arc;
 use surrealdb::engine::local::Db;
 use surrealdb::sql::Thing;
 use surrealdb::Surreal;
+use tokio::sync::RwLock;
 
 pub async fn add_canvas(client: &Surreal<Db>, canvas: Canvas) -> anyhow::Result<Canvas> {
     log::debug!("add_canvas: canvas={:?}", canvas);
@@ -61,8 +66,9 @@ pub async fn list_canvas(
 
 async fn create_node_common(
     client: &Surreal<Db>,
+    embedding_manager: Option<&Arc<RwLock<EmbeddingServiceManager>>>,
     canvas_id: Thing,
-    node: Node,
+    mut node: Node,
     relation: Option<(Thing, &'static str)>,
     op_name: &str,
 ) -> anyhow::Result<Node> {
@@ -73,6 +79,62 @@ async fn create_node_common(
         node,
         relation.is_some()
     );
+
+    // 1. Fetch Canvas to check embedding_id and inject element
+    // 1. Fetch Canvas to check embedding_id and inject element
+    let sql_canvas = "SELECT * FROM $id";
+    let response_canvas = client
+        .query(sql_canvas)
+        .bind(("id", canvas_id.clone()))
+        .await
+        .ok();
+    let canvas: Option<Canvas> =
+        response_canvas.and_then(|mut r| r.take::<Option<Canvas>>(0).ok().flatten());
+    if let Some(canvas) = canvas {
+        if let Some(embedding_id) = canvas.embedding_id {
+            if let NodeType::Chat { data, embedding } = &mut node.type_ {
+                // Only generate embedding if it doesn't exist yet (though usually it doesn't on creation)
+                if embedding.is_none() {
+                    if let Some(manager_arc) = embedding_manager {
+                        let manager = manager_arc.read().await;
+
+                        // Extract text from user input
+                        let mut text = String::new();
+                        for part in &data.input.user_input.content {
+                            match part {
+                                ContentPart::Text(t) => text.push_str(t),
+                                _ => {}
+                            }
+                        }
+
+                        if !text.is_empty() {
+                            // Use embedding_id as service name.
+                            // Pass "default" as model name if we don't know it, or maybe use embedding_id as model too?
+                            // Based on user "embedding_id is local, google, openai", it matches service name.
+                            // We'll use "default" for model name for now as Local ignores it.
+                            let embeddings = manager
+                                .embed(&embedding_id, "default", vec![text])
+                                .await
+                                .map_err(|e| {
+                                    anyhow::anyhow!("Failed to generate embedding: {}", e)
+                                })?;
+
+                            if let Some(emb) = embeddings.first() {
+                                *embedding = Some(ChatNodeEmbedding {
+                                    embedding_id: embedding_id.clone(),
+                                    embedding: emb.clone(),
+                                });
+                            }
+                        }
+                    } else {
+                        return Err(anyhow::anyhow!(
+                            "Embedding service manager not provided but canvas requires embedding"
+                        ));
+                    }
+                }
+            }
+        }
+    }
 
     let (extra_relate_sql, from_id) = match relation {
         Some((from, edge)) => (
@@ -137,18 +199,25 @@ async fn create_node_common(
     Ok(result)
 }
 
-pub async fn add_node(client: &Surreal<Db>, canvas_id: Thing, node: Node) -> anyhow::Result<Node> {
-    create_node_common(client, canvas_id, node, None, "add_node").await
+pub async fn add_node(
+    client: &Surreal<Db>,
+    embedding_manager: Option<&Arc<RwLock<EmbeddingServiceManager>>>,
+    canvas_id: Thing,
+    node: Node,
+) -> anyhow::Result<Node> {
+    create_node_common(client, embedding_manager, canvas_id, node, None, "add_node").await
 }
 
 pub async fn add_derived_node(
     client: &Surreal<Db>,
+    embedding_manager: Option<&Arc<RwLock<EmbeddingServiceManager>>>,
     canvas_id: Thing,
     from: Thing,
     to: Node,
 ) -> anyhow::Result<Node> {
     create_node_common(
         client,
+        embedding_manager,
         canvas_id,
         to,
         Some((from, "derives")),
@@ -159,12 +228,14 @@ pub async fn add_derived_node(
 
 pub async fn add_sequenced_node(
     client: &Surreal<Db>,
+    embedding_manager: Option<&Arc<RwLock<EmbeddingServiceManager>>>,
     canvas_id: Thing,
     from: Thing,
     to: Node,
 ) -> anyhow::Result<Node> {
     create_node_common(
         client,
+        embedding_manager,
         canvas_id,
         to,
         Some((from, "sequences")),
@@ -362,12 +433,41 @@ mod tests {
         }
     }
 
+    fn create_dummy_embedding_canvas() -> Canvas {
+        Canvas {
+            id: None,
+            title: "Embedding Canvas".to_string(),
+            created_at: chrono::Utc::now(),
+            embedding_id: Some("local".to_string()),
+            reranker_id: None,
+        }
+    }
+
     fn create_dummy_node() -> Node {
         Node {
             id: None,
             position: NodePosition { x: 100.0, y: 200.0 },
             type_: NodeType::Link {
                 url: Url::parse("https://example.com").unwrap(),
+            },
+        }
+    }
+
+    fn create_dummy_chat_node() -> Node {
+        Node {
+            id: None,
+            position: NodePosition { x: 100.0, y: 200.0 },
+            type_: NodeType::Chat {
+                data: ChatNodeData {
+                    input: LlmInput {
+                        system_prompt: None,
+                        history: vec![],
+                        user_input: Message::new_text(Role::User, "Hello world"),
+                    },
+                    output: None,
+                    model_id: None,
+                },
+                embedding: None,
             },
         }
     }
@@ -401,7 +501,7 @@ mod tests {
         let canvas_id = canvas.id.unwrap();
 
         let node = create_dummy_node();
-        let created_node = add_node(&db, canvas_id.clone(), node.clone())
+        let created_node = add_node(&db, None, canvas_id.clone(), node.clone())
             .await
             .unwrap();
 
@@ -420,7 +520,7 @@ mod tests {
         let fake_canvas_id = Thing::from(("canvas", "nonexistent"));
         let node = create_dummy_node();
 
-        let result = add_node(&db, fake_canvas_id, node).await;
+        let result = add_node(&db, None, fake_canvas_id, node).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Canvas not found"));
     }
@@ -431,21 +531,21 @@ mod tests {
         let canvas = add_canvas(&db, create_dummy_canvas()).await.unwrap();
         let canvas_id = canvas.id.unwrap();
 
-        let node1 = add_node(&db, canvas_id.clone(), create_dummy_node())
+        let node1 = add_node(&db, None, canvas_id.clone(), create_dummy_node())
             .await
             .unwrap();
         let node1_id = node1.id.unwrap();
 
         // Test add_derived_node
         let node2_data = create_dummy_node();
-        let node2 = add_derived_node(&db, canvas_id.clone(), node1_id.clone(), node2_data)
+        let node2 = add_derived_node(&db, None, canvas_id.clone(), node1_id.clone(), node2_data)
             .await
             .unwrap();
         let node2_id = node2.id.clone().unwrap();
 
         // Test add_sequenced_node
         let node3_data = create_dummy_node();
-        let node3 = add_sequenced_node(&db, canvas_id.clone(), node1_id.clone(), node3_data)
+        let node3 = add_sequenced_node(&db, None, canvas_id.clone(), node1_id.clone(), node3_data)
             .await
             .unwrap();
         let node3_id = node3.id.unwrap();
@@ -467,7 +567,7 @@ mod tests {
     async fn test_move_node() {
         let db = setup_db().await;
         let canvas = add_canvas(&db, create_dummy_canvas()).await.unwrap();
-        let node = add_node(&db, canvas.id.unwrap(), create_dummy_node())
+        let node = add_node(&db, None, canvas.id.unwrap(), create_dummy_node())
             .await
             .unwrap();
         let node_id = node.id.unwrap();
@@ -489,12 +589,12 @@ mod tests {
         let canvas = add_canvas(&db, create_dummy_canvas()).await.unwrap();
         let canvas_id = canvas.id.unwrap();
 
-        let node1 = add_node(&db, canvas_id.clone(), create_dummy_node())
+        let node1 = add_node(&db, None, canvas_id.clone(), create_dummy_node())
             .await
             .unwrap();
         let node1_id = node1.id.clone().unwrap();
 
-        let node2 = add_derived_node(&db, canvas_id, node1_id.clone(), create_dummy_node())
+        let node2 = add_derived_node(&db, None, canvas_id, node1_id.clone(), create_dummy_node())
             .await
             .unwrap();
         let node2_id = node2.id.unwrap();
@@ -539,7 +639,9 @@ mod tests {
             },
         };
 
-        let node = add_node(&db, canvas.id.unwrap(), node_data).await.unwrap();
+        let node = add_node(&db, None, canvas.id.unwrap(), node_data)
+            .await
+            .unwrap();
         let node_id = node.id.unwrap();
 
         let output = LlmOutput {
@@ -562,6 +664,61 @@ mod tests {
                 }
             }
             _ => panic!("Unexpected node type"),
+        }
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_add_node_with_embedding() {
+        use crate::embedding::provider::local::LocalEmbedding;
+
+        // 1. Setup DB and Manager
+        let db = setup_db().await;
+        let mut manager = EmbeddingServiceManager::new();
+        // Create local service (this might fail if models are not downloaded, but strictly for this test we might mock?
+        // But the requirement says "local embedding service를 만들고... tested logic".
+        // LocalEmbedding::new() downloads models.
+        // Assuming environment allows usage of LocalEmbedding if tests are running.
+        let local_service = LocalEmbedding::new()
+            .await
+            .expect("Failed to create local embedding service");
+        manager.add_service("local".to_string(), Box::new(local_service));
+        let manager_arc = Arc::new(RwLock::new(manager));
+        println!("Test environment setup complete.");
+
+        // 2. Create Canvas with embedding_id="local"
+        let canvas = add_canvas(&db, create_dummy_embedding_canvas())
+            .await
+            .unwrap();
+        let canvas_id = canvas.id.unwrap();
+        println!("Canvas created with embedding_id='local': {:?}", canvas_id);
+
+        // 3. Add Chat Node
+        let node_data = create_dummy_chat_node();
+        let created_node = add_node(&db, Some(&manager_arc), canvas_id.clone(), node_data)
+            .await
+            .unwrap();
+        println!("Chat Node created: {:?}", created_node);
+
+        // 4. Verify embedding is present
+        match created_node.type_ {
+            NodeType::Chat { embedding, .. } => {
+                assert!(embedding.is_some());
+                let emb = embedding.unwrap();
+                assert_eq!(emb.embedding_id, "local");
+                assert!(!emb.embedding.is_empty());
+                assert_eq!(emb.embedding_id, "local");
+                assert!(!emb.embedding.is_empty());
+                assert!(emb.embedding.len() > 0);
+                println!("Embedding verification successful.");
+                println!("Embedding ID: {}", emb.embedding_id);
+                println!("Embedding Length: {}", emb.embedding.len());
+                println!(
+                    "Embedding Vector (first 5): {:?}",
+                    &emb.embedding[..5.min(emb.embedding.len())]
+                );
+            }
+            _ => panic!("Expected Chat node"),
         }
     }
 }

@@ -1,6 +1,7 @@
 use crate::db::event_loop::EventLoop;
 use crate::db::events::DbEvent;
 use crate::db::schema::{Canvas, Derives, Node, Sequences};
+use crate::embedding::EmbeddingServiceManager;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -8,7 +9,7 @@ use surrealdb::engine::local::{Db, Mem, RocksDb};
 use surrealdb::sql::Thing;
 use surrealdb::Surreal;
 use tauri::{AppHandle, Emitter};
-use tokio::sync::{mpsc, oneshot, OnceCell};
+use tokio::sync::{mpsc, oneshot, OnceCell, RwLock};
 
 pub mod event_loop;
 pub mod events;
@@ -30,7 +31,11 @@ pub enum DatabaseConfig {
 }
 
 impl Database {
-    pub async fn init(app_handle: AppHandle, config: DatabaseConfig) -> anyhow::Result<Arc<Self>> {
+    pub async fn init(
+        app_handle: AppHandle,
+        config: DatabaseConfig,
+        embedding_manager: Arc<RwLock<EmbeddingServiceManager>>,
+    ) -> anyhow::Result<Arc<Self>> {
         let client = match config {
             DatabaseConfig::InMemory => {
                 let client = Surreal::new::<Mem>(()).await?;
@@ -60,6 +65,7 @@ impl Database {
         let (sender, receiver) = mpsc::channel(100);
         let event_loop = EventLoop::new(
             client.clone(),
+            embedding_manager,
             receiver,
             err_tx,
             Duration::from_millis(500),
@@ -204,8 +210,10 @@ mod tests {
         let (err_tx, _err_rx) = mpsc::channel(100);
 
         let (sender, receiver) = mpsc::channel(100);
+        let dummy_manager = Arc::new(RwLock::new(EmbeddingServiceManager::new()));
         let event_loop = EventLoop::new(
             client.clone(),
+            dummy_manager,
             receiver,
             err_tx,
             Duration::from_millis(50),

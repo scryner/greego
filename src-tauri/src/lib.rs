@@ -5,6 +5,7 @@ pub mod llm;
 
 use db::Database;
 // use llm::{openai_compatible::OpenAiCompatibleService, LlmService}; // Removed
+use embedding::EmbeddingServiceManager; // Added
 use llm::LlmServiceManager; // Added
 use std::sync::Arc;
 // use std::time::Duration; // Removed unused
@@ -31,19 +32,23 @@ pub fn run() {
             // TODO: Make this configurable via config file or env var if needed.
             let config = db::DatabaseConfig::InMemory;
 
-            let db_arc =
-                tauri::async_runtime::block_on(
-                    async move { Database::init(app_handle, config).await },
-                )
-                .expect("Failed to initialize database");
-
-            // Manage the Database (cloning the struct which holds the Arc)
-            app.manage((*db_arc).clone());
-
             // Initialize LLM Service Manager
             let llm_manager = LlmServiceManager::new();
             let llm_manager_arc = Arc::new(RwLock::new(llm_manager));
             app.manage(llm_manager_arc);
+
+            // Initialize Embedding Service Manager
+            let embedding_manager = EmbeddingServiceManager::new();
+            let embedding_manager_arc = Arc::new(RwLock::new(embedding_manager));
+            app.manage(embedding_manager_arc.clone());
+
+            let db_arc = tauri::async_runtime::block_on(async move {
+                Database::init(app_handle, config, embedding_manager_arc).await
+            })
+            .expect("Failed to initialize database");
+
+            // Manage the Database (cloning the struct which holds the Arc)
+            app.manage((*db_arc).clone());
 
             Ok(())
         })

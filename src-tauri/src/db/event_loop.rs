@@ -1,15 +1,17 @@
 use crate::db::events::{DbEvent, EventPriority};
 use crate::db::operation;
+use crate::embedding::EmbeddingServiceManager;
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, RwLock};
 use tokio::time::{interval, Interval};
 
 pub struct EventLoop {
     client: Arc<Surreal<Db>>,
+    embedding_manager: Arc<RwLock<EmbeddingServiceManager>>,
     queue: VecDeque<DbEvent>,
     receiver: mpsc::Receiver<DbEvent>,
     error_sender: mpsc::Sender<String>,
@@ -21,6 +23,7 @@ pub struct EventLoop {
 impl EventLoop {
     pub fn new(
         client: Arc<Surreal<Db>>,
+        embedding_manager: Arc<RwLock<EmbeddingServiceManager>>,
         receiver: mpsc::Receiver<DbEvent>,
         error_sender: mpsc::Sender<String>,
         check_interval: Duration,
@@ -32,6 +35,7 @@ impl EventLoop {
 
         Self {
             client,
+            embedding_manager,
             queue: VecDeque::with_capacity(max_queue_len),
             receiver,
             error_sender,
@@ -148,7 +152,13 @@ impl EventLoop {
                 node,
                 response,
             } => {
-                let res = operation::add_node(&self.client, canvas_id, node).await;
+                let res = operation::add_node(
+                    &self.client,
+                    Some(&self.embedding_manager),
+                    canvas_id,
+                    node,
+                )
+                .await;
                 self.report_error_if_any(&res).await;
                 let _ = response.send(res);
             }
@@ -158,7 +168,14 @@ impl EventLoop {
                 to,
                 response,
             } => {
-                let res = operation::add_derived_node(&self.client, canvas_id, from, to).await;
+                let res = operation::add_derived_node(
+                    &self.client,
+                    Some(&self.embedding_manager),
+                    canvas_id,
+                    from,
+                    to,
+                )
+                .await;
                 self.report_error_if_any(&res).await;
                 let _ = response.send(res);
             }
@@ -168,7 +185,14 @@ impl EventLoop {
                 to,
                 response,
             } => {
-                let res = operation::add_sequenced_node(&self.client, canvas_id, from, to).await;
+                let res = operation::add_sequenced_node(
+                    &self.client,
+                    Some(&self.embedding_manager),
+                    canvas_id,
+                    from,
+                    to,
+                )
+                .await;
                 self.report_error_if_any(&res).await;
                 let _ = response.send(res);
             }
@@ -215,8 +239,10 @@ mod tests {
         let (sender, receiver) = mpsc::channel(100);
 
         // Use a short interval for testing
+        let dummy_manager = Arc::new(RwLock::new(EmbeddingServiceManager::new()));
         let event_loop = EventLoop::new(
             client.clone(),
+            dummy_manager,
             receiver,
             err_tx,
             Duration::from_millis(50),
@@ -261,6 +287,7 @@ mod tests {
             embedding_id: None,
             reranker_id: None,
         };
+
         let created = operation::add_canvas(client, canvas).await.unwrap();
         created.id.unwrap()
     }
@@ -323,6 +350,7 @@ mod tests {
         let derived = rx2.await.unwrap().unwrap();
         assert!(derived.id.is_some());
 
+        // Verify relation in DB using load_canvas
         // Verify relation in DB using load_canvas
         let (_, derives, _) = operation::load_canvas(&client, canvas_id).await.unwrap();
         assert_eq!(derives.len(), 1);
@@ -390,7 +418,16 @@ mod tests {
         // Send multiple moves quickly.
         let (_tx_q, rx_q) = mpsc::channel(100);
         let (tx_e, _rx_e) = mpsc::channel(100);
-        let mut el = EventLoop::new(client.clone(), rx_q, tx_e, Duration::from_secs(1), 50, 1000);
+        let dummy_manager = Arc::new(RwLock::new(EmbeddingServiceManager::new()));
+        let mut el = EventLoop::new(
+            client.clone(),
+            dummy_manager,
+            rx_q,
+            tx_e,
+            Duration::from_secs(1),
+            50,
+            1000,
+        );
 
         el.queue.push_back(DbEvent::MoveNode {
             node_id: node_id.clone(),
