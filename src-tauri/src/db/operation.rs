@@ -62,92 +62,71 @@ pub async fn list_canvas(
     Ok(canvases)
 }
 
-async fn create_node_common(
-    client: &Surreal<Db>,
+async fn fetch_canvas(client: &Surreal<Db>, canvas_id: &Thing) -> anyhow::Result<Canvas> {
+    let sql = "SELECT * FROM $id";
+    let mut response = client.query(sql).bind(("id", canvas_id.clone())).await?;
+    let canvas: Option<Canvas> = response.take(0)?;
+    canvas.ok_or_else(|| anyhow::anyhow!("Canvas not found"))
+}
+
+async fn enrich_node_with_embedding(
+    node: &mut Node,
     embedding_service: Option<&dyn EmbeddingService>,
-    canvas_id: Thing,
-    mut node: Node,
-    relation: Option<(Thing, &'static str)>,
-    op_name: &str,
-) -> anyhow::Result<Node> {
-    log::debug!(
-        "{}: canvas_id={}, node={:?}, relation_exists={}",
-        op_name,
-        canvas_id,
-        node,
-        relation.is_some()
-    );
+    embedding_id: Option<&str>,
+) -> anyhow::Result<()> {
+    if let NodeType::Chat { data, embedding } = &mut node.type_ {
+        // Only generate embedding if it doesn't exist yet
+        if embedding.is_none() {
+            if let Some(emb_id) = embedding_id {
+                let service = embedding_service.ok_or_else(|| {
+                    anyhow::anyhow!("Embedding service not provided but canvas requires embedding")
+                })?;
 
-    // 1. Fetch Canvas to check embedding_id and inject element
-    let sql_canvas = "SELECT * FROM $id";
-    let response_canvas = client
-        .query(sql_canvas)
-        .bind(("id", canvas_id.clone()))
-        .await
-        .ok();
-    let canvas: Option<Canvas> =
-        response_canvas.and_then(|mut r| r.take::<Option<Canvas>>(0).ok().flatten());
-    if let Some(canvas) = canvas {
-        if let Some(embedding_id) = canvas.embedding_id {
-            if let NodeType::Chat { data, embedding } = &mut node.type_ {
-                // Only generate embedding if it doesn't exist yet (though usually it doesn't on creation)
-                if embedding.is_none() {
-                    if let Some(service) = embedding_service {
-                        // Extract text from LLM output (not user input)
-                        // Only proceed if output exists
-                        if let Some(output) = &data.output {
-                            let mut text = String::new();
-                            for part in &output.content {
-                                match part {
-                                    ContentPart::Text(t) => text.push_str(t),
-                                    _ => {}
-                                }
-                            }
+                if let Some(output) = &data.output {
+                    let mut text = String::new();
+                    for part in &output.content {
+                        if let ContentPart::Text(t) = part {
+                            text.push_str(t);
+                        }
+                    }
 
-                            if !text.is_empty() {
-                                // 1. Semantic Chunking
-                                use crate::embedding::chunking::SemanticChunking;
-                                let chunker = SemanticChunking::new("default".to_string(), 0.8);
+                    if !text.is_empty() {
+                        use crate::embedding::chunking::SemanticChunking;
+                        let chunker = SemanticChunking::new("default".to_string(), 0.8);
 
-                                match chunker.chunk(&text, service).await {
-                                    Ok(chunks) => {
-                                        if !chunks.is_empty() {
-                                            // 2. Generate embeddings for chunks
-                                            let embeddings_result =
-                                                service.embed("default", chunks.clone()).await;
-
-                                            match embeddings_result {
-                                                Ok(embeddings) => {
-                                                    *embedding = Some(ChatNodeEmbedding {
-                                                        embedding_id: embedding_id.clone(),
-                                                        chunks: embeddings,
-                                                    });
-                                                }
-                                                Err(e) => {
-                                                    log::error!(
-                                                        "Failed to generate embeddings for chunks: {}",
-                                                        e
-                                                    );
-                                                }
-                                            }
+                        match chunker.chunk(&text, service).await {
+                            Ok(chunks) => {
+                                if !chunks.is_empty() {
+                                    match service.embed("default", chunks.clone()).await {
+                                        Ok(embeddings) => {
+                                            *embedding = Some(ChatNodeEmbedding {
+                                                embedding_id: emb_id.to_string(),
+                                                chunks: embeddings,
+                                            });
+                                        }
+                                        Err(e) => {
+                                            log::error!("Failed to generate embeddings: {}", e)
                                         }
                                     }
-                                    Err(e) => {
-                                        log::error!("Failed to chunk text: {}", e);
-                                    }
                                 }
                             }
+                            Err(e) => log::error!("Failed to chunk text: {}", e),
                         }
-                    } else {
-                        return Err(anyhow::anyhow!(
-                            "Embedding service not provided but canvas requires embedding"
-                        ));
                     }
                 }
             }
         }
     }
+    Ok(())
+}
 
+async fn store_node(
+    client: &Surreal<Db>,
+    canvas_id: Thing,
+    data: Node,
+    relation: Option<(Thing, &'static str)>,
+    op_name: &str,
+) -> anyhow::Result<Node> {
     let (extra_relate_sql, from_id) = match relation {
         Some((from, edge)) => (
             format!(
@@ -161,9 +140,6 @@ async fn create_node_common(
 
     let sql = format!(
         r#"
-        IF array::len((SELECT * FROM $canvas_id)) == 0 {{
-            THROW "Canvas not found";
-        }};
         let $node = (CREATE node CONTENT $node_data);
         let $node_id = $node[0].id;
         RELATE $canvas_id -> holds -> $node_id;
@@ -176,37 +152,50 @@ async fn create_node_common(
     let mut query = client
         .query(sql)
         .bind(("canvas_id", canvas_id))
-        .bind(("node_data", node));
+        .bind(("node_data", data));
 
     if let Some(from) = from_id {
         query = query.bind(("from", from));
     }
 
-    let response = query
+    let mut response = query
         .await
-        .inspect_err(|e| log::error!("{}: query failed: {}", op_name, e))?;
-
-    let mut response = response
+        .inspect_err(|e| log::error!("{}: query failed: {}", op_name, e))?
         .check()
         .inspect_err(|e| log::error!("{}: check failed: {}", op_name, e))?;
 
-    let return_idx = if !extra_relate_sql.is_empty() { 5 } else { 4 };
+    let return_idx = if !extra_relate_sql.is_empty() { 4 } else { 3 };
 
-    let created: Option<Node> = response.take(return_idx).inspect_err(|e| {
-        log::error!(
-            "{}: failed to retrieve created node from response: {}",
-            op_name,
-            e
-        )
-    })?;
-    let result = created.ok_or_else(|| {
+    let created: Option<Node> = response
+        .take(return_idx)
+        .inspect_err(|e| log::error!("{}: failed to retrieve created node: {}", op_name, e))?;
+
+    created.ok_or_else(|| {
         log::error!("{}: query succeeded but returned no created node", op_name);
-        match op_name {
-            "add_derived_node" => anyhow::anyhow!("Failed to create derived node"),
-            "add_sequenced_node" => anyhow::anyhow!("Failed to create sequenced node"),
-            _ => anyhow::anyhow!("Failed to create node"),
-        }
-    })?;
+        anyhow::anyhow!("Failed to create node")
+    })
+}
+
+async fn create_node_common(
+    client: &Surreal<Db>,
+    embedding_service: Option<&dyn EmbeddingService>,
+    canvas_id: Thing,
+    mut node: Node,
+    relation: Option<(Thing, &'static str)>,
+    op_name: &str,
+) -> anyhow::Result<Node> {
+    log::debug!("{}: canvas_id={}, node={:?}", op_name, canvas_id, node);
+
+    // 1. Fetch Canvas to check embedding_id
+    let canvas = fetch_canvas(client, &canvas_id).await?;
+
+    // 2. Enrich node with embedding if applicable
+    enrich_node_with_embedding(&mut node, embedding_service, canvas.embedding_id.as_deref())
+        .await?;
+
+    // 3. Store node in DB
+    let result = store_node(client, canvas_id, node, relation, op_name).await?;
+
     log::debug!("{}: success, created={:?}", op_name, result);
     Ok(result)
 }
