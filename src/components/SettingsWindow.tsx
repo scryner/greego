@@ -688,10 +688,7 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({ onClose }) => {
                                 <span className="material-icons-round text-lg">auto_awesome</span>
                                 LLM services
                             </button>
-                            <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors text-left text-sm font-medium">
-                                <span className="material-icons-round text-lg">format_list_numbered</span>
-                                Prompts
-                            </button>
+
                         </div>
                     </nav>
                 </div>
