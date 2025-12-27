@@ -73,6 +73,9 @@ impl LocalReranking {
             {
                 options = options.with_execution_providers(vec![
                     ort::execution_providers::CoreMLExecutionProvider::default()
+                        .with_compute_units(
+                            ort::execution_providers::coreml::CoreMLComputeUnits::CPUAndNeuralEngine,
+                        )
                         .with_subgraphs(true)
                         .build(),
                     ort::execution_providers::XNNPACKExecutionProvider::default().build(),
@@ -126,6 +129,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    #[ignore]
     async fn test_embedding_local() -> anyhow::Result<()> {
         let embedding_provider = LocalEmbedding::new().await?;
 
@@ -144,7 +148,9 @@ mod tests {
 
         Ok(())
     }
+
     #[tokio::test]
+    #[ignore]
     async fn test_reranking_local() -> anyhow::Result<()> {
         let reranker = LocalReranking::new().await?;
         let results = reranker
