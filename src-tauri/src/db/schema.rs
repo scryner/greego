@@ -11,6 +11,8 @@ pub struct Canvas {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<Thing>,
     pub title: String,
+    pub text_embedding_id: Option<String>,
+    pub text_reranker_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
