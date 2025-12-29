@@ -31,9 +31,14 @@ pub struct ChatNodeData {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChatNodeEmbedding {
-    pub embedding_id: String,
-    pub chunks: Vec<Vec<f32>>,
+pub struct Chunk {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<Thing>,
+    pub content: String,
+    pub embedding: Vec<f32>,
+    pub node: Thing,
+    pub canvas: Thing,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,7 +46,7 @@ pub struct ChatNodeEmbedding {
 pub enum NodeType {
     Chat {
         data: ChatNodeData,
-        embedding: Option<ChatNodeEmbedding>,
+        // embedding field removed in favor of Chunk table
     },
     Link {
         url: Url,
@@ -90,4 +95,14 @@ pub struct Sequences {
     #[serde(alias = "out")]
     pub to: Thing,
     pub canvas: Thing,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HasChunk {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<Thing>,
+    #[serde(alias = "in")]
+    pub node: Thing,
+    #[serde(alias = "out")]
+    pub chunk: Thing,
 }

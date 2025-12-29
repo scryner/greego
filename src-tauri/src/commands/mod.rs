@@ -197,7 +197,6 @@ pub async fn invoke_chat_command(
                 output: None,
                 model_id: Some(model_id.clone()),
             },
-            embedding: None,
         },
     };
 

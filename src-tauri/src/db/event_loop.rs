@@ -285,7 +285,6 @@ mod tests {
                     output: None,
                     model_id: None,
                 },
-                embedding: None,
             },
         }
     }

@@ -1,5 +1,5 @@
-use crate::db::schema::{Canvas, Derives, Node, Sequences};
-use crate::db::schema::{ChatNodeEmbedding, NodeType};
+use crate::db::schema::NodeType;
+use crate::db::schema::{Canvas, Chunk, Derives, Node, Sequences};
 use crate::embedding::EmbeddingService; // Changed from EmbeddingServiceManager
 use crate::llm::ContentPart;
 use surrealdb::engine::local::Db;
@@ -69,49 +69,87 @@ async fn fetch_canvas(client: &Surreal<Db>, canvas_id: &Thing) -> anyhow::Result
     canvas.ok_or_else(|| anyhow::anyhow!("Canvas not found"))
 }
 
-async fn enrich_node_with_embedding(
-    node: &mut Node,
+async fn generate_and_store_embeddings(
+    client: &Surreal<Db>,
+    node: &Node,
+    node_id: &Thing,
+    canvas_id: &Thing,
     embedding_service: Option<&dyn EmbeddingService>,
     embedding_id: Option<&str>,
 ) -> anyhow::Result<()> {
-    if let NodeType::Chat { data, embedding } = &mut node.type_ {
-        // Only generate embedding if it doesn't exist yet
-        if embedding.is_none() {
-            if let Some(emb_id) = embedding_id {
-                let service = embedding_service.ok_or_else(|| {
-                    anyhow::anyhow!("Embedding service not provided but canvas requires embedding")
-                })?;
+    if let NodeType::Chat { data } = &node.type_ {
+        if embedding_id.is_some() {
+            let service = embedding_service.ok_or_else(|| {
+                anyhow::anyhow!("Embedding service not provided but canvas requires embedding")
+            })?;
 
-                if let Some(output) = &data.output {
-                    let mut text = String::new();
-                    for part in &output.content {
-                        if let ContentPart::Text(t) = part {
-                            text.push_str(t);
-                        }
+            if let Some(output) = &data.output {
+                let mut text = String::new();
+                for part in &output.content {
+                    if let ContentPart::Text(t) = part {
+                        text.push_str(t);
                     }
+                }
 
-                    if !text.is_empty() {
-                        use crate::embedding::chunking::SemanticChunking;
-                        let chunker = SemanticChunking::new("default".to_string(), 0.8);
+                if !text.is_empty() {
+                    use crate::embedding::chunking::SemanticChunking;
+                    let chunker = SemanticChunking::new("default".to_string(), 0.8);
 
-                        match chunker.chunk(&text, service).await {
-                            Ok(chunks) => {
-                                if !chunks.is_empty() {
-                                    match service.embed("default", chunks.clone()).await {
-                                        Ok(embeddings) => {
-                                            *embedding = Some(ChatNodeEmbedding {
-                                                embedding_id: emb_id.to_string(),
-                                                chunks: embeddings,
-                                            });
+                    match chunker.chunk(&text, service).await {
+                        Ok(chunks) => {
+                            if !chunks.is_empty() {
+                                match service.embed("default", chunks.clone()).await {
+                                    Ok(embeddings) => {
+                                        // Delete existing chunks for this node to avoid duplicates via relation
+                                        let delete_sql = r#"
+                                            DELETE chunk WHERE id IN (SELECT VALUE out FROM has_chunk WHERE in = $node_id);
+                                            DELETE has_chunk WHERE in = $node_id;
+                                        "#;
+                                        client
+                                            .query(delete_sql)
+                                            .bind(("node_id", node_id.clone()))
+                                            .await
+                                            .inspect_err(|e| {
+                                                log::error!(
+                                                    "Failed to delete existing chunks and relations: {}",
+                                                    e
+                                                )
+                                            })?;
+
+                                        // Store new chunks and create relations
+                                        let insert_sql = r#"
+                                            let $chunk = (CREATE chunk CONTENT $chunk_data);
+                                            let $cid = $chunk[0].id;
+                                            RELATE $node_id -> has_chunk -> $cid;
+                                        "#;
+                                        for (i, content) in chunks.iter().enumerate() {
+                                            if let Some(embedding) = embeddings.get(i) {
+                                                let chunk = Chunk {
+                                                    id: None,
+                                                    content: content.clone(),
+                                                    embedding: embedding.clone(),
+                                                    node: node_id.clone(),
+                                                    canvas: canvas_id.clone(),
+                                                    created_at: chrono::Utc::now(),
+                                                };
+                                                client
+                                                    .query(insert_sql)
+                                                    .bind(("chunk_data", chunk))
+                                                    .bind(("node_id", node_id.clone()))
+                                                    .await
+                                                    .inspect_err(|e| {
+                                                        log::error!("Failed to save chunk: {}", e)
+                                                    })?;
+                                            }
                                         }
-                                        Err(e) => {
-                                            log::error!("Failed to generate embeddings: {}", e)
-                                        }
+                                    }
+                                    Err(e) => {
+                                        log::error!("Failed to generate embeddings: {}", e)
                                     }
                                 }
                             }
-                            Err(e) => log::error!("Failed to chunk text: {}", e),
                         }
+                        Err(e) => log::error!("Failed to chunk text: {}", e),
                     }
                 }
             }
@@ -170,17 +208,18 @@ async fn store_node(
         .take(return_idx)
         .inspect_err(|e| log::error!("{}: failed to retrieve created node: {}", op_name, e))?;
 
-    created.ok_or_else(|| {
+    let result = created.ok_or_else(|| {
         log::error!("{}: query succeeded but returned no created node", op_name);
         anyhow::anyhow!("Failed to create node")
-    })
+    })?;
+    Ok(result)
 }
 
 async fn create_node_common(
     client: &Surreal<Db>,
     embedding_service: Option<&dyn EmbeddingService>,
     canvas_id: Thing,
-    mut node: Node,
+    node: Node,
     relation: Option<(Thing, &'static str)>,
     op_name: &str,
 ) -> anyhow::Result<Node> {
@@ -189,12 +228,21 @@ async fn create_node_common(
     // 1. Fetch Canvas to check embedding_id
     let canvas = fetch_canvas(client, &canvas_id).await?;
 
-    // 2. Enrich node with embedding if applicable
-    enrich_node_with_embedding(&mut node, embedding_service, canvas.embedding_id.as_deref())
-        .await?;
+    // 2. Store node in DB
+    let result = store_node(client, canvas_id.clone(), node.clone(), relation, op_name).await?;
 
-    // 3. Store node in DB
-    let result = store_node(client, canvas_id, node, relation, op_name).await?;
+    // 3. Generate and store embeddings if applicable (now using the created node's ID)
+    if let Some(node_id) = &result.id {
+        generate_and_store_embeddings(
+            client,
+            &node, // Use original node logic or result? Result has ID, but type is same.
+            node_id,
+            &canvas_id,
+            embedding_service,
+            canvas.embedding_id.as_deref(),
+        )
+        .await?;
+    }
 
     log::debug!("{}: success, created={:?}", op_name, result);
     Ok(result)
@@ -289,6 +337,10 @@ pub async fn delete_node(client: &Surreal<Db>, node_id: Thing) -> anyhow::Result
         IF $derives_count[0].count > 0 OR $sequences_count[0].count > 0 {
             THROW "Cannot delete node: it is referenced by other nodes.";
         };
+
+        // Delete chunks associated via has_chunk
+        DELETE chunk WHERE id IN (SELECT VALUE out FROM has_chunk WHERE in = $node_id);
+        DELETE has_chunk WHERE in = $node_id;
 
         // Delete 'holds' relations associated with this node
         DELETE holds WHERE out = $node_id;
@@ -410,6 +462,49 @@ pub async fn get_node(client: &Surreal<Db>, node_id: Thing) -> anyhow::Result<No
     Ok(result)
 }
 
+pub async fn search_chunks(
+    client: &Surreal<Db>,
+    canvas_id: Thing,
+    query_embedding: Vec<f32>,
+    limit: usize,
+    threshold: f32,
+) -> anyhow::Result<Vec<Chunk>> {
+    log::debug!(
+        "search_chunks: canvas_id={}, limit={}, threshold={}",
+        canvas_id,
+        limit,
+        threshold
+    );
+
+    let sql = r#"
+        SELECT *, vector::similarity::cosine(embedding, $query_embedding) AS score
+        FROM chunk
+        WHERE canvas = $canvas_id
+          AND vector::similarity::cosine(embedding, $query_embedding) > $threshold
+        ORDER BY score DESC
+        LIMIT $limit;
+    "#;
+
+    let mut response = client
+        .query(sql)
+        .bind(("canvas_id", canvas_id))
+        .bind(("query_embedding", query_embedding))
+        .bind(("threshold", threshold))
+        .bind(("limit", limit))
+        .await
+        .inspect_err(|e| log::error!("search_chunks: query failed: {}", e))?;
+
+    let chunks: Vec<Chunk> = response.take(0).inspect_err(|e| {
+        log::error!(
+            "search_chunks: failed to retrieve chunks from response: {}",
+            e
+        )
+    })?;
+
+    log::debug!("search_chunks: success, count={}", chunks.len());
+    Ok(chunks)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -471,7 +566,6 @@ mod tests {
                     output: None,
                     model_id: None,
                 },
-                embedding: None,
             },
         }
     }
@@ -639,7 +733,6 @@ mod tests {
             position: NodePosition { x: 0.0, y: 0.0 },
             type_: NodeType::Chat {
                 data: chat_node_data,
-                embedding: None,
             },
         };
 
@@ -717,19 +810,149 @@ mod tests {
             .unwrap();
         println!("Chat Node created: {:?}", created_node);
 
-        // 4. Verify embedding is present
-        match created_node.type_ {
-            NodeType::Chat { embedding, .. } => {
-                assert!(embedding.is_some());
-                let emb = embedding.unwrap();
-                assert_eq!(emb.embedding_id, "local");
-                assert!(!emb.chunks.is_empty());
-                assert!(emb.chunks[0].len() > 0);
-                println!("Embedding verification successful.");
-                println!("Embedding ID: {}", emb.embedding_id);
-                println!("Chunks Count: {}", emb.chunks.len());
-            }
-            _ => panic!("Expected Chat node"),
+        // 4. Verify embedding is present (in chunks table)
+        let node_id = created_node.id.unwrap();
+
+        let sql = "SELECT * FROM chunk WHERE node = $node_id";
+        let mut response = db.query(sql).bind(("node_id", node_id)).await.unwrap();
+        let chunks: Vec<Chunk> = response.take(0).unwrap();
+
+        assert!(!chunks.is_empty());
+        assert_eq!(
+            chunks[0].content.trim(),
+            "This is the response that will be chunked and embedded."
+        ); // Semantic chunking might return the whole sentence
+        assert!(!chunks[0].embedding.is_empty());
+        println!("Chunks verification successful. Count: {}", chunks.len());
+    }
+
+    #[tokio::test]
+    async fn test_search_chunks() {
+        use crate::embedding::provider::local::LocalEmbedding;
+
+        // 1. Setup DB and Manager
+        let db = setup_db().await;
+        let mut manager = EmbeddingServiceManager::new();
+        let local_service = LocalEmbedding::new()
+            .await
+            .expect("Failed to create local embedding service");
+        manager.add_service("local".to_string(), Box::new(local_service));
+        let manager_arc = Arc::new(RwLock::new(manager));
+
+        let canvas = add_canvas(&db, create_dummy_embedding_canvas())
+            .await
+            .unwrap();
+        let canvas_id = canvas.id.unwrap();
+
+        // 2. Add Node with content
+        let mut node_data = create_dummy_chat_node();
+        if let NodeType::Chat { data, .. } = &mut node_data.type_ {
+            data.output = Some(LlmOutput {
+                content: vec![ContentPart::Text(
+                    "The quick brown fox jumps over the lazy dog.".to_string(),
+                )],
+                usage: None,
+                raw: None,
+            });
         }
+
+        let mg = manager_arc.read().await;
+        let service = mg.get_service("local").unwrap();
+        add_node(&db, Some(service.as_ref()), canvas_id.clone(), node_data)
+            .await
+            .unwrap();
+
+        // 3. Search
+        let query_vec = service
+            .embed("default", vec!["fox".to_string()])
+            .await
+            .unwrap()[0]
+            .clone();
+
+        let chunks = search_chunks(&db, canvas_id, query_vec, 5, 0.0)
+            .await
+            .unwrap();
+
+        assert!(!chunks.is_empty());
+        assert!(chunks[0].content.contains("fox"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_node_cascades_chunks() {
+        use crate::embedding::provider::local::LocalEmbedding;
+        let db = setup_db().await;
+
+        let mut manager = EmbeddingServiceManager::new();
+        // Assuming test env has model or we use a mock.
+        // For real integration tests we need the model.
+        // If this fails due to missing model, we might need a workaround or ensure model is present.
+        let local_service = LocalEmbedding::new()
+            .await
+            .expect("Failed to create local embedding service");
+        manager.add_service("local".to_string(), Box::new(local_service));
+        let manager_arc = Arc::new(RwLock::new(manager));
+
+        let canvas = add_canvas(&db, create_dummy_embedding_canvas())
+            .await
+            .unwrap();
+        let canvas_id = canvas.id.unwrap();
+
+        // 1. Create Node with Embedding
+        let mut node_data = create_dummy_chat_node();
+        if let NodeType::Chat { data, .. } = &mut node_data.type_ {
+            data.output = Some(LlmOutput {
+                content: vec![ContentPart::Text(
+                    "Cascading deletion test content.".to_string(),
+                )],
+                usage: None,
+                raw: None,
+            });
+        }
+        let mg = manager_arc.read().await;
+        let service = mg.get_service("local").unwrap();
+        let node = add_node(&db, Some(service.as_ref()), canvas_id.clone(), node_data)
+            .await
+            .unwrap();
+        let node_id = node.id.unwrap();
+
+        // 2. Verify chunks exist
+        let sql = "SELECT * FROM chunk WHERE node = $node_id";
+        let mut response = db
+            .query(sql)
+            .bind(("node_id", node_id.clone()))
+            .await
+            .unwrap();
+        let chunks: Vec<Chunk> = response.take(0).unwrap();
+        assert!(!chunks.is_empty(), "Chunks should exist before deletion");
+
+        // 3. Verify relations exist
+        let rel_sql = "SELECT value out FROM has_chunk WHERE in = $node_id";
+        let mut response = db
+            .query(rel_sql)
+            .bind(("node_id", node_id.clone()))
+            .await
+            .unwrap();
+        let chunk_ids: Vec<Thing> = response.take(0).unwrap();
+        assert!(
+            !chunk_ids.is_empty(),
+            "Relations should exist before deletion"
+        );
+
+        // 4. Delete Node
+        delete_node(&db, node_id.clone()).await.unwrap();
+
+        // 5. Verify Chunks are gone
+        let mut response = db
+            .query(sql)
+            .bind(("node_id", node_id.clone()))
+            .await
+            .unwrap();
+        let chunks: Vec<Chunk> = response.take(0).unwrap();
+        assert!(chunks.is_empty(), "Chunks should be deleted");
+
+        // 6. Verify Relations are gone
+        let mut response = db.query(rel_sql).bind(("node_id", node_id)).await.unwrap();
+        let chunk_ids: Vec<Thing> = response.take(0).unwrap();
+        assert!(chunk_ids.is_empty(), "Relations should be deleted");
     }
 }
