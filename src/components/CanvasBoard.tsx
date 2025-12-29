@@ -40,6 +40,7 @@ export const CanvasBoard = () => {
     const [nodes, setNodes, onNodesChange] = useNodesState<AppNodeType>(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
     const [error, setError] = useState<string | null>(null);
+    const [canvasId, setCanvasId] = useState<string>("canvas:main");
 
     // Keep track of latest nodes for async callbacks
     const nodesRef = useRef(nodes);
@@ -51,6 +52,11 @@ export const CanvasBoard = () => {
     useEffect(() => {
         edgesRef.current = edges;
     }, [edges]);
+
+    const canvasIdRef = useRef(canvasId);
+    useEffect(() => {
+        canvasIdRef.current = canvasId;
+    }, [canvasId]);
 
     useEffect(() => {
         // Listen for backend errors
@@ -157,10 +163,10 @@ export const CanvasBoard = () => {
             const relationType = nodeData?.relationType;
             const selectedModel = nodeData?.modelId || "";
 
+
             // Invoke backend
-            const canvasId = "canvas:main";
             const newNodes = await GraphAPI.invokeChat(
-                canvasId,
+                canvasIdRef.current,
                 text,
                 selectedModel,
                 tempPos ? tempPos.x : 0,
@@ -507,9 +513,13 @@ export const CanvasBoard = () => {
                         });
                 }
 
-                const [backendNodes, backendEdges] = await loadGraphPromise;
+                const { nodes: backendNodes, edges: backendEdges, canvas } = await loadGraphPromise;
 
                 if (ignore) return;
+
+                if (canvas && canvas.id) {
+                    setCanvasId(getSafeId(canvas.id));
+                }
 
                 if (backendNodes.length === 0) {
                     // Empty canvas -> Auto create chat node

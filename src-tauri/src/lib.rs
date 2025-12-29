@@ -30,7 +30,10 @@ pub fn run() {
             let app_handle = app.handle().clone();
             // Default to InMemory for now, as requested.
             // TODO: Make this configurable via config file or env var if needed.
-            let config = db::DatabaseConfig::InMemory;
+            let config = db::DatabaseConfig {
+                connection: db::DatabaseConnectionConfig::InMemory,
+                default_first_canvas_title: "New Canvas".to_string(),
+            };
 
             // Initialize LLM Service Manager
             let llm_manager = LlmServiceManager::new();

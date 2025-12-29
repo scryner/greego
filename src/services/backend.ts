@@ -51,8 +51,20 @@ export const GraphAPI = {
         return await invoke('connect_edge_command', { edgeId, source, target });
     },
 
-    loadGraph: async (canvasId: string = "canvas:main"): Promise<[ChatNode[], FlowEdge[]]> => {
-        const [nodes, derives, sequences] = await invoke<[ChatNode[], any[], any[]]>('load_canvas_command', { canvasId });
+    loadGraph: async (canvasId: string = "canvas:main"): Promise<{ nodes: ChatNode[], edges: FlowEdge[], canvas: Canvas | null }> => {
+        const data = await invoke<{
+            canvas: Canvas,
+            nodes: ChatNode[],
+            derives: any[],
+            sequences: any[]
+        } | null>('load_canvas_command', { canvasId });
+
+        if (!data) {
+            console.warn(`Canvas ${canvasId} not found`);
+            return { nodes: [], edges: [], canvas: null };
+        }
+
+        const { canvas, nodes, derives, sequences } = data;
 
         const edges: FlowEdge[] = [
             ...derives.map(d => ({
@@ -67,7 +79,7 @@ export const GraphAPI = {
             }))
         ];
 
-        return [nodes, edges];
+        return { nodes, edges, canvas };
     },
 
     invokeChat: async (canvasId: string, prompt: string, model: string, x: number, y: number, parentId?: string, relationType?: 'sequence' | 'derive'): Promise<ChatNode[]> => {

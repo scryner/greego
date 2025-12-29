@@ -22,10 +22,17 @@ static DB: OnceCell<Arc<Database>> = OnceCell::const_new();
 pub struct Database {
     pub client: Arc<Surreal<Db>>,
     sender: mpsc::Sender<DbEvent>,
+    config: DatabaseConfig,
 }
 
 #[derive(Clone)]
-pub enum DatabaseConfig {
+pub struct DatabaseConfig {
+    pub connection: DatabaseConnectionConfig,
+    pub default_first_canvas_title: String,
+}
+
+#[derive(Clone)]
+pub enum DatabaseConnectionConfig {
     InMemory,
     Persistent(PathBuf),
 }
@@ -36,12 +43,12 @@ impl Database {
         config: DatabaseConfig,
         embedding_manager: Arc<RwLock<EmbeddingServiceManager>>,
     ) -> anyhow::Result<Arc<Self>> {
-        let client = match config {
-            DatabaseConfig::InMemory => {
+        let client = match config.connection.clone() {
+            DatabaseConnectionConfig::InMemory => {
                 let client = Surreal::new::<Mem>(()).await?;
                 client
             }
-            DatabaseConfig::Persistent(path) => {
+            DatabaseConnectionConfig::Persistent(path) => {
                 let client = Surreal::new::<RocksDb>(path).await?;
                 client
             }
@@ -78,7 +85,11 @@ impl Database {
             event_loop.run().await;
         });
 
-        let db = Arc::new(Self { client, sender });
+        let db = Arc::new(Self {
+            client,
+            sender,
+            config,
+        });
 
         // Initialize if not already set
         let _ = DB.set(db);
@@ -100,7 +111,28 @@ impl Database {
     }
 
     pub async fn load_canvas(&self, canvas_id: Thing) -> anyhow::Result<Option<CanvasData>> {
-        operation::load_canvas(&self.client, canvas_id).await
+        let result = operation::load_canvas(&self.client, canvas_id).await?;
+        if result.is_none() {
+            // Check if DB is empty
+            if operation::is_canvas_empty(&self.client).await? {
+                // Create default canvas
+                let new_canvas = Canvas {
+                    id: None,
+                    title: self.config.default_first_canvas_title.clone(),
+                    created_at: chrono::Utc::now(),
+                    embedding_id: None,
+                    reranker_id: None,
+                };
+                let created = self.add_canvas(new_canvas).await?;
+                return Ok(Some(CanvasData {
+                    canvas: created,
+                    nodes: vec![],
+                    derives: vec![],
+                    sequences: vec![],
+                }));
+            }
+        }
+        Ok(result)
     }
 
     pub async fn add_canvas(&self, canvas: Canvas) -> anyhow::Result<Canvas> {
@@ -231,7 +263,14 @@ mod tests {
             event_loop.run().await;
         });
 
-        Database { client, sender }
+        Database {
+            client,
+            sender,
+            config: DatabaseConfig {
+                connection: DatabaseConnectionConfig::InMemory,
+                default_first_canvas_title: "New Canvas".to_string(),
+            },
+        }
     }
 
     fn mock_node() -> Node {
@@ -326,5 +365,62 @@ mod tests {
             "Should find 1 node attached to canvas"
         );
         assert_eq!(canvas_data.nodes[0].id, Some(created_id), "ID should match");
+    }
+
+    #[tokio::test]
+    async fn test_database_load_canvas_auto_create() {
+        // 1. Setup DB with specific config
+        let client = Surreal::new::<Mem>(()).await.unwrap();
+        client.use_ns("test").use_db("test").await.unwrap();
+        let client = Arc::new(client);
+        let (sender, receiver) = mpsc::channel(100);
+        let (err_tx, _) = mpsc::channel(100);
+
+        let dummy_manager = Arc::new(RwLock::new(EmbeddingServiceManager::new()));
+        let event_loop = EventLoop::new(
+            client.clone(),
+            dummy_manager,
+            receiver,
+            err_tx,
+            Duration::from_millis(50),
+            10,
+            100,
+        );
+        tokio::spawn(async move {
+            event_loop.run().await;
+        });
+
+        // Initialize with "My Default Canvas" title
+        let db = Database {
+            client,
+            sender,
+            config: DatabaseConfig {
+                connection: DatabaseConnectionConfig::InMemory,
+                default_first_canvas_title: "My Default Canvas".to_string(),
+            },
+        };
+
+        // 2. Database is empty. Request a load.
+        let fake_id = Thing::from(("canvas", "nonexistent"));
+        let result = db.load_canvas(fake_id.clone()).await.unwrap();
+
+        // 3. Should return a canvas
+        assert!(result.is_some(), "Should have auto-created a canvas");
+        let data = result.unwrap();
+        assert_eq!(data.canvas.title, "My Default Canvas");
+
+        // 4. Verify it was actually saved
+        let list = db.list_canvas(10, 0).await.unwrap();
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].title, "My Default Canvas");
+
+        // 5. Subsequent load of nonexistent ID should NOT create another one
+        // because DB is no longer empty.
+        let fake_id_2 = Thing::from(("canvas", "another_fake"));
+        let result_2 = db.load_canvas(fake_id_2).await.unwrap();
+        assert!(
+            result_2.is_none(),
+            "Should NOT create second default canvas"
+        );
     }
 }

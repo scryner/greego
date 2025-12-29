@@ -62,6 +62,13 @@ pub async fn list_canvas(
     Ok(canvases)
 }
 
+pub async fn is_canvas_empty(client: &Surreal<Db>) -> anyhow::Result<bool> {
+    let sql = "SELECT count() FROM canvas GROUP ALL";
+    let mut response = client.query(sql).await?;
+    let result: Option<usize> = response.take("count")?;
+    Ok(result.unwrap_or(0) == 0)
+}
+
 async fn fetch_canvas(client: &Surreal<Db>, canvas_id: &Thing) -> anyhow::Result<Canvas> {
     let sql = "SELECT * FROM $id";
     let mut response = client.query(sql).bind(("id", canvas_id.clone())).await?;
