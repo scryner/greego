@@ -1,5 +1,5 @@
 use crate::db::schema::NodeType;
-use crate::db::schema::{Canvas, Chunk, Derives, Node, Sequences};
+use crate::db::schema::{Canvas, CanvasData, Chunk, Derives, Node, Sequences};
 use crate::embedding::EmbeddingService; // Changed from EmbeddingServiceManager
 use crate::llm::ContentPart;
 use surrealdb::engine::local::Db;
@@ -369,8 +369,20 @@ pub async fn delete_node(client: &Surreal<Db>, node_id: Thing) -> anyhow::Result
 pub async fn load_canvas(
     client: &Surreal<Db>,
     canvas_id: Thing,
-) -> anyhow::Result<(Vec<Node>, Vec<Derives>, Vec<Sequences>)> {
+) -> anyhow::Result<Option<CanvasData>> {
     log::debug!("load_canvas: canvas_id={}", canvas_id);
+
+    // 1. Check if canvas exists
+    let sql = "SELECT * FROM $id";
+    let mut response = client.query(sql).bind(("id", canvas_id.clone())).await?;
+    let canvas_result: Option<Canvas> = response.take(0)?;
+    let canvas = match canvas_result {
+        Some(c) => c,
+        None => {
+            log::debug!("load_canvas: canvas not found");
+            return Ok(None);
+        }
+    };
 
     let sql = r#"
         SELECT * FROM node WHERE id IN (SELECT VALUE out FROM holds WHERE in = $canvas_id);
@@ -399,7 +411,13 @@ pub async fn load_canvas(
         derives.len(),
         sequences.len()
     );
-    Ok((nodes, derives, sequences))
+
+    Ok(Some(CanvasData {
+        canvas,
+        nodes,
+        derives,
+        sequences,
+    }))
 }
 
 pub async fn update_chat_node_output(
@@ -607,9 +625,9 @@ mod tests {
         assert_eq!(created_node.position.x, node.position.x);
 
         // Verify node is in canvas via load_canvas
-        let (nodes, _, _) = load_canvas(&db, canvas_id).await.unwrap();
-        assert_eq!(nodes.len(), 1);
-        assert_eq!(nodes[0].id, created_node.id);
+        let canvas_data = load_canvas(&db, canvas_id).await.unwrap().unwrap();
+        assert_eq!(canvas_data.nodes.len(), 1);
+        assert_eq!(canvas_data.nodes[0].id, created_node.id);
     }
 
     #[tokio::test]
@@ -621,6 +639,15 @@ mod tests {
         let result = add_node(&db, None, fake_canvas_id, node).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Canvas not found"));
+    }
+
+    #[tokio::test]
+    async fn test_load_canvas_none() {
+        let db = setup_db().await;
+        let fake_canvas_id = Thing::from(("canvas", "nonexistent"));
+
+        let result = load_canvas(&db, fake_canvas_id).await.unwrap();
+        assert!(result.is_none());
     }
 
     #[tokio::test]
@@ -649,16 +676,16 @@ mod tests {
         let node3_id = node3.id.unwrap();
 
         // Verify relations
-        let (nodes, derives, sequences) = load_canvas(&db, canvas_id).await.unwrap();
-        assert_eq!(nodes.len(), 3);
-        assert_eq!(derives.len(), 1);
-        assert_eq!(sequences.len(), 1);
+        let canvas_data = load_canvas(&db, canvas_id).await.unwrap().unwrap();
+        assert_eq!(canvas_data.nodes.len(), 3);
+        assert_eq!(canvas_data.derives.len(), 1);
+        assert_eq!(canvas_data.sequences.len(), 1);
 
-        assert_eq!(derives[0].from, node1_id);
-        assert_eq!(derives[0].to, node2_id);
+        assert_eq!(canvas_data.derives[0].from, node1_id);
+        assert_eq!(canvas_data.derives[0].to, node2_id);
 
-        assert_eq!(sequences[0].from, node1_id);
-        assert_eq!(sequences[0].to, node3_id);
+        assert_eq!(canvas_data.sequences[0].from, node1_id);
+        assert_eq!(canvas_data.sequences[0].to, node3_id);
     }
 
     #[tokio::test]

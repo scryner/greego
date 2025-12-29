@@ -1,4 +1,4 @@
-use crate::db::schema::{Canvas, Derives, Node, Sequences};
+use crate::db::schema::{Canvas, Node};
 use crate::db::Database;
 // use crate::llm::LlmService; // Removed
 use crate::llm::LlmServiceManager; // Added
@@ -13,7 +13,7 @@ pub mod llm; // Register the new module
 pub async fn load_canvas_command(
     state: State<'_, Database>,
     canvas_id: String,
-) -> Result<(Vec<Node>, Vec<Derives>, Vec<Sequences>), String> {
+) -> Result<Option<crate::db::schema::CanvasData>, String> {
     let (tb, id_str) = canvas_id
         .split_once(':')
         .ok_or("Invalid ID format. Expected 'table:id'")?;

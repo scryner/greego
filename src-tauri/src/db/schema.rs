@@ -17,6 +17,14 @@ pub struct Canvas {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CanvasData {
+    pub canvas: Canvas,
+    pub nodes: Vec<Node>,
+    pub derives: Vec<Derives>,
+    pub sequences: Vec<Sequences>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodePosition {
     pub x: f64,
     pub y: f64,

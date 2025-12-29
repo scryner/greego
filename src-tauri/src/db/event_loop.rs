@@ -159,6 +159,11 @@ impl EventLoop {
                 self.report_error_if_any(&res).await;
                 let _ = response.send(res);
             }
+            DbEvent::LoadCanvas(canvas_id, response) => {
+                let res = operation::load_canvas(&self.client, canvas_id).await;
+                self.report_error_if_any(&res).await;
+                let _ = response.send(res);
+            }
             DbEvent::AddNode {
                 canvas_id,
                 node,
@@ -363,10 +368,13 @@ mod tests {
 
         // Verify relation in DB using load_canvas
         // Verify relation in DB using load_canvas
-        let (_, derives, _) = operation::load_canvas(&client, canvas_id).await.unwrap();
-        assert_eq!(derives.len(), 1);
-        assert_eq!(derives[0].from, root.id.unwrap());
-        assert_eq!(derives[0].to, derived.id.unwrap());
+        let canvas_data = operation::load_canvas(&client, canvas_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(canvas_data.derives.len(), 1);
+        assert_eq!(canvas_data.derives[0].from, root.id.unwrap());
+        assert_eq!(canvas_data.derives[0].to, derived.id.unwrap());
     }
 
     #[tokio::test]
@@ -402,10 +410,13 @@ mod tests {
         assert!(sequenced.id.is_some());
 
         // Verify relation in DB using load_canvas
-        let (_, _, sequences) = operation::load_canvas(&client, canvas_id).await.unwrap();
-        assert_eq!(sequences.len(), 1);
-        assert_eq!(sequences[0].from, root.id.unwrap());
-        assert_eq!(sequences[0].to, sequenced.id.unwrap());
+        let canvas_data = operation::load_canvas(&client, canvas_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(canvas_data.sequences.len(), 1);
+        assert_eq!(canvas_data.sequences[0].from, root.id.unwrap());
+        assert_eq!(canvas_data.sequences[0].to, sequenced.id.unwrap());
     }
 
     #[tokio::test]

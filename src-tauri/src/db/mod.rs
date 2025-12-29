@@ -1,6 +1,6 @@
 use crate::db::event_loop::EventLoop;
 use crate::db::events::DbEvent;
-use crate::db::schema::{Canvas, Derives, Node, Sequences};
+use crate::db::schema::{Canvas, CanvasData, Node};
 use crate::embedding::EmbeddingServiceManager;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -90,10 +90,16 @@ impl Database {
         DB.get().cloned()
     }
 
-    pub async fn load_canvas(
-        &self,
-        canvas_id: Thing,
-    ) -> anyhow::Result<(Vec<Node>, Vec<Derives>, Vec<Sequences>)> {
+    pub async fn get_map(&self, canvas_id: Thing) -> anyhow::Result<Option<CanvasData>> {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        self.sender
+            .send(DbEvent::LoadCanvas(canvas_id, tx))
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to send LoadCanvas event: {}", e))?;
+        rx.await?
+    }
+
+    pub async fn load_canvas(&self, canvas_id: Thing) -> anyhow::Result<Option<CanvasData>> {
         operation::load_canvas(&self.client, canvas_id).await
     }
 
@@ -270,8 +276,8 @@ mod tests {
         let created = db.add_node(canvas_id.clone(), node).await.unwrap();
         assert!(created.id.is_some());
 
-        let (nodes, _, _) = db.load_canvas(canvas_id).await.unwrap();
-        assert_eq!(nodes.len(), 1);
+        let canvas_data = db.load_canvas(canvas_id).await.unwrap().unwrap();
+        assert_eq!(canvas_data.nodes.len(), 1);
     }
 
     #[tokio::test]
@@ -313,8 +319,12 @@ mod tests {
         let created_id = created_node.id.unwrap();
 
         // Verify we can load it back via load_canvas (which checks relations)
-        let (nodes, _, _) = db.load_canvas(canvas_id).await.unwrap();
-        assert_eq!(nodes.len(), 1, "Should find 1 node attached to canvas");
-        assert_eq!(nodes[0].id, Some(created_id), "ID should match");
+        let canvas_data = db.load_canvas(canvas_id).await.unwrap().unwrap();
+        assert_eq!(
+            canvas_data.nodes.len(),
+            1,
+            "Should find 1 node attached to canvas"
+        );
+        assert_eq!(canvas_data.nodes[0].id, Some(created_id), "ID should match");
     }
 }
