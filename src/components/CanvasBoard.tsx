@@ -36,7 +36,11 @@ const initialEdges: Edge[] = [];
 // while ensuring the valid component instance receives the data.
 let loadGraphPromise: ReturnType<typeof GraphAPI.loadGraph> | null = null;
 
-export const CanvasBoard = () => {
+interface CanvasBoardProps {
+    onCanvasLoad?: (title: string) => void;
+}
+
+export const CanvasBoard: React.FC<CanvasBoardProps> = ({ onCanvasLoad }) => {
     const [nodes, setNodes, onNodesChange] = useNodesState<AppNodeType>(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
     const [error, setError] = useState<string | null>(null);
@@ -521,6 +525,10 @@ export const CanvasBoard = () => {
                     setCanvasId(getSafeId(canvas.id));
                 }
 
+                if (canvas && canvas.title && onCanvasLoad) {
+                    onCanvasLoad(canvas.title);
+                }
+
                 if (backendNodes.length === 0) {
                     // Empty canvas -> Auto create chat node
                     // Verify we haven't already added one (double safety)
@@ -589,6 +597,7 @@ export const CanvasBoard = () => {
                     gap={20}
                     size={1}
                     color="transparent"
+
                 />
                 <Controls className="!bg-surface-light dark:!bg-surface-dark !border-border-light dark:!border-border-dark !shadow-lg !rounded-full !p-1.5 [&>button]:!border-none [&>button]:!rounded-full [&>button]:hover:!bg-slate-100 dark:[&>button]:hover:!bg-slate-800 [&>button]:!text-slate-500 dark:[&>button]:!text-slate-400 [&>button]:!transition-colors" />
                 <MiniMap

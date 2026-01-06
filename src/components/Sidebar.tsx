@@ -1,17 +1,41 @@
-
+import React, { useState, useRef, useEffect } from 'react';
 
 interface SidebarProps {
     onOpenSettings?: () => void;
+    title?: string;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings, title = "Subject" }) => {
+    const [isTruncated, setIsTruncated] = useState(false);
+    const titleRef = useRef<HTMLHeadingElement>(null);
+
+    useEffect(() => {
+        const checkTruncation = () => {
+            if (titleRef.current) {
+                setIsTruncated(titleRef.current.scrollWidth > titleRef.current.clientWidth);
+            }
+        };
+
+        checkTruncation();
+        window.addEventListener('resize', checkTruncation);
+        return () => window.removeEventListener('resize', checkTruncation);
+    }, [title]);
+
     return (
         <aside className="w-80 flex flex-col border-r border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark shadow-sm z-20 flex-shrink-0">
             <div className="h-12 px-4 flex items-center justify-between border-b border-border-light dark:border-border-dark">
                 <button className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors">
                     <span className="material-icons-round">menu</span>
                 </button>
-                <h1 className="text-base font-semibold text-slate-800 dark:text-white">Subject</h1>
+                <div className="flex-1 px-4 min-w-0 flex justify-start">
+                    <h1
+                        ref={titleRef}
+                        className="text-base font-semibold text-slate-800 dark:text-white truncate cursor-default"
+                        title={isTruncated ? title : undefined}
+                    >
+                        {title}
+                    </h1>
+                </div>
                 <div className="flex items-center gap-2">
                     <button onClick={onOpenSettings} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 dark:text-slate-500 transition-colors">
                         <span className="material-icons-round text-xl">settings</span>
