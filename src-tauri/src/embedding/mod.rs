@@ -4,6 +4,7 @@ pub mod provider;
 use anyhow::Result;
 use async_trait::async_trait;
 use log::debug;
+use provider::local::LocalEmbedding;
 use std::collections::HashMap;
 
 pub type Embedding = Vec<f32>;
@@ -23,7 +24,9 @@ pub struct EmbeddingServiceManager {
 
 impl Default for EmbeddingServiceManager {
     fn default() -> Self {
-        Self::new()
+        Self {
+            services: HashMap::new(),
+        }
     }
 }
 
@@ -31,6 +34,22 @@ impl EmbeddingServiceManager {
     pub fn new() -> Self {
         Self {
             services: HashMap::new(),
+        }
+    }
+
+    pub async fn initialize_local(&mut self) {
+        log::info!("Initializing local embedding service...");
+        match LocalEmbedding::new().await {
+            Ok(local) => {
+                self.services.insert("local".to_string(), Box::new(local));
+                log::info!("Added default local embedding service");
+            }
+            Err(e) => {
+                log::error!(
+                    "Failed to initialize default local embedding service: {}",
+                    e
+                );
+            }
         }
     }
 

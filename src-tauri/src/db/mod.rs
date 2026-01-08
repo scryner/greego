@@ -120,7 +120,7 @@ impl Database {
                     id: None,
                     title: self.config.default_first_canvas_title.clone(),
                     created_at: chrono::Utc::now(),
-                    embedding_id: None,
+                    embedding_id: Some("local".to_string()),
                     reranker_id: None,
                 };
                 let created = self.add_canvas(new_canvas).await?;
@@ -413,6 +413,7 @@ mod tests {
         let list = db.list_canvas(10, 0).await.unwrap();
         assert_eq!(list.len(), 1);
         assert_eq!(list[0].title, "My Default Canvas");
+        assert_eq!(list[0].embedding_id, Some("local".to_string()));
 
         // 5. Subsequent load of nonexistent ID should NOT create another one
         // because DB is no longer empty.

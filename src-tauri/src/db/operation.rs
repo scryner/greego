@@ -84,11 +84,16 @@ async fn generate_and_store_embeddings(
     embedding_service: Option<&dyn EmbeddingService>,
     embedding_id: Option<&str>,
 ) -> anyhow::Result<()> {
+    let mut chunk_count = 0;
     if let NodeType::Chat { data } = &node.type_ {
         if embedding_id.is_some() {
-            let service = embedding_service.ok_or_else(|| {
-                anyhow::anyhow!("Embedding service not provided but canvas requires embedding")
-            })?;
+            let service = match embedding_service {
+                Some(s) => s,
+                None => {
+                    log::warn!("Embedding service not provided but canvas requires embedding. Skipping embedding generation.");
+                    return Ok(());
+                }
+            };
 
             if let Some(output) = &data.output {
                 let mut text = String::new();
@@ -104,6 +109,7 @@ async fn generate_and_store_embeddings(
 
                     match chunker.chunk(&text, service).await {
                         Ok(chunks) => {
+                            chunk_count = chunks.len();
                             if !chunks.is_empty() {
                                 match service.embed("default", chunks.clone()).await {
                                     Ok(embeddings) => {
@@ -162,6 +168,12 @@ async fn generate_and_store_embeddings(
             }
         }
     }
+    log::debug!(
+        "generate_and_store_embeddings: success, node_id={}, chunks={}, embedding_id={:?}",
+        node_id,
+        chunk_count,
+        embedding_id
+    );
     Ok(())
 }
 

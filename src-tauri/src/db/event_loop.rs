@@ -138,8 +138,15 @@ impl EventLoop {
             .bind(("id", canvas_id.clone()))
             .await
             .ok()?;
-        let canvas: Option<crate::db::schema::Canvas> = response.take(0).ok()?;
-        canvas?.embedding_id
+
+        // Retrieve the first record as a struct with just the embedding_id, or use a generic Value
+        #[derive(serde::Deserialize)]
+        struct PartialCanvas {
+            embedding_id: Option<String>,
+        }
+
+        let partial: Option<PartialCanvas> = response.take(0).ok()?;
+        partial?.embedding_id
     }
 
     async fn execute_event(&self, event: DbEvent) {
@@ -171,6 +178,11 @@ impl EventLoop {
             } => {
                 let embedding_id = self.get_embedding_id(&canvas_id).await;
                 let manager = self.embedding_manager.read().await;
+                log::debug!(
+                    "AddNode: embedding_id={:?}, available_services={:?}",
+                    embedding_id,
+                    manager.list_services()
+                );
                 let service = embedding_id
                     .as_deref()
                     .and_then(|id| manager.get_service(id).map(|s| s.as_ref()));

@@ -38,6 +38,10 @@ pub async fn add_canvas_command(
     state: State<'_, Database>,
     canvas: Canvas,
 ) -> Result<Canvas, String> {
+    let mut canvas = canvas;
+    if canvas.embedding_id.is_none() {
+        canvas.embedding_id = Some("local".to_string());
+    }
     state.add_canvas(canvas).await.map_err(|e| e.to_string())
 }
 
