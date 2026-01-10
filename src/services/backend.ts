@@ -11,6 +11,7 @@ export interface Canvas {
     created_at: string;
     embedding_id?: string;
     reranker_id?: string;
+    chat_model_id?: string;
 }
 
 // Matching Rust struct ChatNode
@@ -93,4 +94,28 @@ export const GraphAPI = {
     moveNodePosition: async (nodeId: string, x: number, y: number): Promise<void> => {
         return await invoke('move_node_position_command', { nodeId, x, y });
     },
+
+    updateCanvasChatModel: async (canvasId: string, modelId: string | null): Promise<Canvas> => {
+        return await invoke('update_canvas_chat_model_command', { canvasId, modelId });
+    },
+};
+
+// Helper to safely convert backend ID to string
+export const getSafeId = (id: any): string => {
+    if (typeof id === 'string') return id;
+    if (typeof id === 'object' && id !== null) {
+        // Check for SurrealDB Thing structure
+        if ('tb' in id && 'id' in id) {
+            let innerId = id.id;
+            if (typeof innerId === 'object' && innerId !== null && 'String' in innerId) {
+                innerId = innerId.String;
+            } else if (typeof innerId === 'object') {
+                innerId = JSON.stringify(innerId);
+            }
+            return `${id.tb}:${innerId}`;
+        }
+        // Fallback for other objects
+        return JSON.stringify(id);
+    }
+    return String(id);
 };

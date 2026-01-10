@@ -14,6 +14,7 @@ pub struct Canvas {
     pub created_at: DateTime<Utc>,
     pub embedding_id: Option<String>,
     pub reranker_id: Option<String>,
+    pub chat_model_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

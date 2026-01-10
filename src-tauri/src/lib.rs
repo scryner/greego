@@ -41,7 +41,9 @@ pub async fn run() {
             commands::llm::add_llm_service,
             commands::llm::delete_llm_service,
             commands::llm::list_llm_services,
+            commands::llm::list_llm_services,
             commands::llm::get_llm_available_models,
+            commands::update_canvas_chat_model_command,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

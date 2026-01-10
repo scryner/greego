@@ -46,6 +46,22 @@ pub async fn add_canvas_command(
 }
 
 #[tauri::command]
+pub async fn update_canvas_chat_model_command(
+    state: State<'_, Database>,
+    canvas_id: String,
+    model_id: Option<String>,
+) -> Result<Canvas, String> {
+    let (tb, id_str) = canvas_id
+        .split_once(':')
+        .ok_or("Invalid ID format. Expected 'table:id'")?;
+    let thing = surrealdb::sql::Thing::from((tb.to_string(), id_str.to_string()));
+    state
+        .update_canvas_chat_model_id(thing, model_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn list_canvas_command(
     state: State<'_, Database>,
     limit: Option<usize>,

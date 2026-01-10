@@ -242,6 +242,16 @@ impl EventLoop {
                 self.report_error_if_any(&res).await;
                 let _ = response.send(res);
             }
+            DbEvent::UpdateCanvasChatModel {
+                canvas_id,
+                model_id,
+                response,
+            } => {
+                let res =
+                    operation::update_canvas_chat_model_id(&self.client, canvas_id, model_id).await;
+                self.report_error_if_any(&res).await;
+                let _ = response.send(res);
+            }
         }
     }
 }
@@ -314,6 +324,7 @@ mod tests {
             created_at: chrono::Utc::now(),
             embedding_id: None,
             reranker_id: None,
+            chat_model_id: None,
         };
 
         let created = operation::add_canvas(client, canvas).await.unwrap();
@@ -606,5 +617,40 @@ mod tests {
             .unwrap();
         let res = rx5.await.unwrap();
         assert!(res.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_event_loop_update_canvas_chat_model() {
+        let (client, sender, _err_rx, _handle) = setup_test_context().await;
+        // 1. Create canvas
+        let canvas_id = create_test_canvas(&client, "test_chat_model").await;
+
+        // 2. Update model ID via event
+        let (tx, rx) = oneshot::channel();
+        sender
+            .send(DbEvent::UpdateCanvasChatModel {
+                canvas_id: canvas_id.clone(),
+                model_id: Some("gpt-4".to_string()),
+                response: tx,
+            })
+            .await
+            .unwrap();
+
+        // 3. Verify response
+        let updated = rx.await.unwrap().unwrap();
+        assert_eq!(updated.chat_model_id, Some("gpt-4".to_string()));
+
+        // 4. Verify in DB directly
+        #[derive(serde::Deserialize)]
+        struct PartialCanvas {
+            chat_model_id: Option<String>,
+        }
+        let mut response = client
+            .query("SELECT chat_model_id FROM $id")
+            .bind(("id", canvas_id))
+            .await
+            .unwrap();
+        let partial: Option<PartialCanvas> = response.take(0).unwrap();
+        assert_eq!(partial.unwrap().chat_model_id, Some("gpt-4".to_string()));
     }
 }

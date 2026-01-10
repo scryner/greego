@@ -40,6 +40,11 @@ pub enum DbEvent {
         node_id: Thing,
         response: oneshot::Sender<anyhow::Result<()>>,
     },
+    UpdateCanvasChatModel {
+        canvas_id: Thing,
+        model_id: Option<String>,
+        response: oneshot::Sender<anyhow::Result<Canvas>>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

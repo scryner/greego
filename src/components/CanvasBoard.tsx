@@ -17,7 +17,7 @@ import { PromptInputNode, type PromptInputNodeType } from './PromptInputNode';
 import { ModelSelector } from './ModelSelector';
 import { useState, useEffect, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
-import { GraphAPI } from '../services/backend';
+import { GraphAPI, getSafeId } from '../services/backend';
 
 const nodeTypes = {
     chatNode: ChatNode,
@@ -37,7 +37,7 @@ const initialEdges: Edge[] = [];
 let loadGraphPromise: ReturnType<typeof GraphAPI.loadGraph> | null = null;
 
 interface CanvasBoardProps {
-    onCanvasLoad?: (title: string) => void;
+    onCanvasLoad?: (canvas: import('../services/backend').Canvas) => void;
 }
 
 export const CanvasBoard: React.FC<CanvasBoardProps> = ({ onCanvasLoad }) => {
@@ -136,25 +136,6 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({ onCanvasLoad }) => {
         }
     };
 
-    // Helper to safely convert backend ID to string
-    const getSafeId = (id: any): string => {
-        if (typeof id === 'string') return id;
-        if (typeof id === 'object' && id !== null) {
-            // Check for SurrealDB Thing structure
-            if ('tb' in id && 'id' in id) {
-                let innerId = id.id;
-                if (typeof innerId === 'object' && innerId !== null && 'String' in innerId) {
-                    innerId = innerId.String;
-                } else if (typeof innerId === 'object') {
-                    innerId = JSON.stringify(innerId);
-                }
-                return `${id.tb}:${innerId}`;
-            }
-            // Fallback for other objects
-            return JSON.stringify(id);
-        }
-        return String(id);
-    };
 
     const handleChatSubmit = async (text: string, tempNodeId: string) => {
         try {
@@ -525,8 +506,8 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({ onCanvasLoad }) => {
                     setCanvasId(getSafeId(canvas.id));
                 }
 
-                if (canvas && canvas.title && onCanvasLoad) {
-                    onCanvasLoad(canvas.title);
+                if (canvas && onCanvasLoad) {
+                    onCanvasLoad(canvas);
                 }
 
                 if (backendNodes.length === 0) {

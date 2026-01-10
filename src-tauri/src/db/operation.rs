@@ -439,6 +439,46 @@ pub async fn load_canvas(
     }))
 }
 
+pub async fn update_canvas_chat_model_id(
+    client: &Surreal<Db>,
+    canvas_id: Thing,
+    model_id: Option<String>,
+) -> anyhow::Result<Canvas> {
+    log::debug!(
+        "update_canvas_chat_model_id: canvas_id={}, model_id={:?}",
+        canvas_id,
+        model_id
+    );
+
+    let sql = r#"
+        UPDATE $canvas_id
+        SET chat_model_id = $model_id
+        RETURN AFTER
+    "#;
+
+    let mut response = client
+        .query(sql)
+        .bind(("canvas_id", canvas_id))
+        .bind(("model_id", model_id))
+        .await
+        .inspect_err(|e| log::error!("update_canvas_chat_model_id: query failed: {}", e))?;
+
+    let updated: Option<Canvas> = response.take(0).inspect_err(|e| {
+        log::error!(
+            "update_canvas_chat_model_id: failed to retrieve updated canvas: {}",
+            e
+        )
+    })?;
+
+    let result = updated.ok_or_else(|| {
+        log::error!("update_canvas_chat_model_id: query succeeded but returned no updated canvas");
+        anyhow::anyhow!("Failed to update canvas chat model id")
+    })?;
+
+    log::debug!("update_canvas_chat_model_id: success, updated={:?}", result);
+    Ok(result)
+}
+
 pub async fn update_chat_node_output(
     client: &Surreal<Db>,
     node_id: Thing,
@@ -566,6 +606,7 @@ mod tests {
             created_at: chrono::Utc::now(),
             embedding_id: None,
             reranker_id: None,
+            chat_model_id: None,
         }
     }
 
@@ -576,6 +617,7 @@ mod tests {
             created_at: chrono::Utc::now(),
             embedding_id: Some("local".to_string()),
             reranker_id: None,
+            chat_model_id: None,
         }
     }
 
@@ -798,16 +840,41 @@ mod tests {
             .unwrap();
 
         match updated_node.type_ {
-            NodeType::Chat { data, .. } => {
+            NodeType::Chat { data } => {
                 assert!(data.output.is_some());
                 let out = data.output.unwrap();
-                match out.content[0] {
-                    ContentPart::Text(ref t) => assert_eq!(t, "Response"),
-                    _ => panic!("Unexpected content type"),
+                assert_eq!(out.content.len(), 1);
+                if let ContentPart::Text(t) = &out.content[0] {
+                    assert_eq!(t, "Response");
+                } else {
+                    panic!("Unexpected content part type");
                 }
             }
             _ => panic!("Unexpected node type"),
         }
+    }
+
+    #[tokio::test]
+    async fn test_update_canvas_chat_model_id() {
+        let db = setup_db().await;
+        let canvas = add_canvas(&db, create_dummy_canvas()).await.unwrap();
+        let canvas_id = canvas.id.unwrap();
+
+        // Initial state: None
+        assert!(canvas.chat_model_id.is_none());
+
+        // Update to "model-v1"
+        let updated =
+            update_canvas_chat_model_id(&db, canvas_id.clone(), Some("model-v1".to_string()))
+                .await
+                .unwrap();
+        assert_eq!(updated.chat_model_id, Some("model-v1".to_string()));
+
+        // Update to None
+        let updated = update_canvas_chat_model_id(&db, canvas_id.clone(), None)
+            .await
+            .unwrap();
+        assert!(updated.chat_model_id.is_none());
     }
 
     #[tokio::test]

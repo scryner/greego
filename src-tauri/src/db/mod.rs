@@ -122,6 +122,7 @@ impl Database {
                     created_at: chrono::Utc::now(),
                     embedding_id: Some("local".to_string()),
                     reranker_id: None,
+                    chat_model_id: None,
                 };
                 let created = self.add_canvas(new_canvas).await?;
                 return Ok(Some(CanvasData {
@@ -231,6 +232,21 @@ impl Database {
         self.sender.send(event).await.expect("Event loop closed");
         rx.await.expect("Response dropped")
     }
+
+    pub async fn update_canvas_chat_model_id(
+        &self,
+        canvas_id: Thing,
+        model_id: Option<String>,
+    ) -> anyhow::Result<Canvas> {
+        let (tx, rx) = oneshot::channel();
+        let event = DbEvent::UpdateCanvasChatModel {
+            canvas_id,
+            model_id,
+            response: tx,
+        };
+        self.sender.send(event).await.expect("Event loop closed");
+        rx.await.expect("Response dropped")
+    }
 }
 
 #[cfg(test)]
@@ -300,6 +316,7 @@ mod tests {
             created_at: chrono::Utc::now(),
             embedding_id: None,
             reranker_id: None,
+            chat_model_id: None,
         }
     }
 

@@ -1,15 +1,25 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ModelSelector } from './ModelSelector';
 
+import { GraphAPI } from '../services/backend';
+
 interface SidebarProps {
     onOpenSettings?: () => void;
     title?: string;
+    canvasId?: string;
+    initialModelId?: string;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings, title = "Subject" }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings, title = "Subject", canvasId, initialModelId }) => {
     const [isTruncated, setIsTruncated] = useState(false);
-    const [currentModel, setCurrentModel] = useState("");
+    const [currentModel, setCurrentModel] = useState(initialModelId || "");
     const titleRef = useRef<HTMLHeadingElement>(null);
+
+    useEffect(() => {
+        if (initialModelId) {
+            setCurrentModel(initialModelId);
+        }
+    }, [initialModelId]);
 
     useEffect(() => {
         const checkTruncation = () => {
@@ -80,7 +90,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings, title = "Subje
                     <div className="mt-2 text-slate-400 dark:text-slate-500 px-1">
                         <ModelSelector
                             currentModel={currentModel}
-                            onModelSelect={setCurrentModel}
+                            onModelSelect={async (model) => {
+                                setCurrentModel(model);
+                                if (canvasId) {
+                                    try {
+                                        await GraphAPI.updateCanvasChatModel(canvasId, model);
+                                    } catch (e) {
+                                        console.error("Failed to update canvas chat model", e);
+                                    }
+                                }
+                            }}
                         />
                     </div>
                 </div>
