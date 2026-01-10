@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { ModelSelector } from './ModelSelector';
 
 interface SidebarProps {
     onOpenSettings?: () => void;
@@ -7,6 +8,7 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings, title = "Subject" }) => {
     const [isTruncated, setIsTruncated] = useState(false);
+    const [currentModel, setCurrentModel] = useState("");
     const titleRef = useRef<HTMLHeadingElement>(null);
 
     useEffect(() => {
@@ -75,8 +77,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings, title = "Subje
                             </div>
                         </div>
                     </div>
-                    <div className="mt-2 flex items-center gap-2 text-slate-400 dark:text-slate-500 px-1">
-                        <span className="text-xs font-medium">lms/gpt-oss-120b</span>
+                    <div className="mt-2 text-slate-400 dark:text-slate-500 px-1">
+                        <ModelSelector
+                            currentModel={currentModel}
+                            onModelSelect={setCurrentModel}
+                        />
                     </div>
                 </div>
             </div>
