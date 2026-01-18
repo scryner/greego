@@ -4,9 +4,10 @@ import { invoke } from '@tauri-apps/api/core';
 interface ModelSelectorProps {
     currentModel: string;
     onModelSelect?: (model: string) => void;
+    className?: string;
 }
 
-export const ModelSelector = ({ currentModel, onModelSelect }: ModelSelectorProps) => {
+export const ModelSelector = ({ currentModel, onModelSelect, className }: ModelSelectorProps) => {
     const [isOpen, setIsOpen] = useState(false);
     const [availableModels, setAvailableModels] = useState<string[]>([]);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -46,6 +47,7 @@ export const ModelSelector = ({ currentModel, onModelSelect }: ModelSelectorProp
                         ? 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200'
                         : 'text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300'
                     }
+                    ${className || ''}
                 `}
             >
                 {currentModel || "Select model"}

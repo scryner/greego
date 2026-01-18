@@ -13,6 +13,8 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings, title = "Subject", canvasId, initialModelId }) => {
     const [isTruncated, setIsTruncated] = useState(false);
     const [currentModel, setCurrentModel] = useState(initialModelId || "");
+    const [query, setQuery] = useState("");
+    const [isShaking, setIsShaking] = useState(false);
     const titleRef = useRef<HTMLHeadingElement>(null);
 
     useEffect(() => {
@@ -32,6 +34,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings, title = "Subje
         window.addEventListener('resize', checkTruncation);
         return () => window.removeEventListener('resize', checkTruncation);
     }, [title]);
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+            e.preventDefault();
+            if (!currentModel) {
+                setIsShaking(true);
+                setTimeout(() => setIsShaking(false), 500);
+                return;
+            }
+            if (query.trim()) {
+                console.log("Unified Query Submitted:", query);
+                // TODO: Implement actual submission logic here
+                setQuery("");
+            }
+        }
+    };
 
     return (
         <aside className="w-80 flex flex-col border-r border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark shadow-sm z-20 flex-shrink-0">
@@ -72,7 +90,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings, title = "Subje
                         <span className="text-xs bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-1 rounded-full">Unified Query</span>
                     </div>
                     <div className="bg-slate-100 dark:bg-slate-900 rounded-lg p-3 border border-transparent focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all shadow-sm">
-                        <textarea className="w-full bg-transparent border-none p-0 text-sm focus:ring-0 resize-none h-12 placeholder-slate-400 dark:placeholder-slate-500 text-slate-800 dark:text-slate-200" placeholder="Ask anything..."></textarea>
+                        <textarea
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            className="w-full bg-transparent border-none p-0 text-sm focus:ring-0 resize-none h-12 placeholder-slate-400 dark:placeholder-slate-500 text-slate-800 dark:text-slate-200"
+                            placeholder="Ask anything..."
+                        ></textarea>
                         <div className="flex items-center justify-between mt-2">
                             <button className="p-1.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors">
                                 <span className="material-icons-round text-lg">add</span>
@@ -100,6 +124,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings, title = "Subje
                                     }
                                 }
                             }}
+                            className={isShaking ? 'animate-shake' : ''}
                         />
                     </div>
                 </div>
