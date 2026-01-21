@@ -98,6 +98,11 @@ export const GraphAPI = {
     updateCanvasChatModel: async (canvasId: string, modelId: string | null): Promise<Canvas> => {
         return await invoke('update_canvas_chat_model_command', { canvasId, modelId });
     },
+
+    unifiedQuery: async (prompt: string, modelId: string): Promise<void> => {
+        console.log("Invoking unified_query_command with:", { prompt, modelId });
+        return await invoke('unified_query_command', { prompt, modelId });
+    },
 };
 
 // Helper to safely convert backend ID to string

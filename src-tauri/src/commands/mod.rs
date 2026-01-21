@@ -350,3 +350,75 @@ pub async fn invoke_chat_command(
 
     Ok(vec![saved_node])
 }
+
+#[tauri::command]
+pub async fn unified_query_command(
+    app_handle: tauri::AppHandle,
+    llm_service: State<'_, Arc<RwLock<LlmServiceManager>>>,
+    prompt: String,
+    model_id: String,
+) -> Result<(), String> {
+    use log::info;
+    info!(
+        "unified_query_command invoked: prompt='{}', model_id='{}'",
+        prompt, model_id
+    );
+    use crate::llm::{LlmInput, Message, Role};
+    use futures::StreamExt;
+    use tauri::Emitter;
+
+    let input = LlmInput {
+        system_prompt: Some("You are a helpful assistant.".to_string()),
+        history: vec![],
+        user_input: Message::new_text(Role::User, prompt),
+    };
+
+    let llm_manager_arc = llm_service.inner().clone();
+    let app_handle_clone = app_handle.clone();
+
+    tokio::spawn(async move {
+        let manager_guard = llm_manager_arc.read().await;
+
+        let (service_id, model_name) = match model_id.split_once('/') {
+            Some((s, m)) => (s, m),
+            None => (model_id.as_str(), ""),
+        };
+
+        match manager_guard
+            .chat_stream(service_id, model_name, input)
+            .await
+        {
+            Ok(mut stream) => {
+                let mut full_text = String::new();
+                while let Some(chunk_res) = stream.next().await {
+                    if let Ok(chunk) = chunk_res {
+                        full_text.push_str(&chunk.content);
+                        let _ = app_handle_clone.emit(
+                            "unified-query-delta",
+                            serde_json::json!({
+                                "content": chunk.content,
+                            }),
+                        );
+                    }
+                }
+
+                let _ = app_handle_clone.emit(
+                    "unified-query-done",
+                    serde_json::json!({
+                        "full_text": full_text
+                    }),
+                );
+            }
+            Err(e) => {
+                let _ = app_handle_clone.emit(
+                    "unified-query-error",
+                    serde_json::json!({
+                        "error": e.to_string()
+                    }),
+                );
+            }
+        }
+    });
+
+    Ok(())
+}
