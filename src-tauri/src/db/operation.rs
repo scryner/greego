@@ -642,7 +642,7 @@ mod tests {
     use super::*;
     use crate::db::schema::{ChatNodeData, NodePosition, NodeType};
     use crate::embedding::EmbeddingServiceManager;
-    use crate::llm::{ContentPart, LlmInput, LlmOutput, Message, Role};
+    use crate::llm::{LlmInput, Message, Role};
     use std::sync::Arc;
     use surrealdb::engine::local::Mem;
     use tauri::Url;
@@ -793,14 +793,14 @@ mod tests {
         // unless we mock it.
         // However, we can test the structure.
         embedding_manager.initialize_local().await;
-        let embedding_manager = Arc::new(RwLock::new(embedding_manager));
+        let _embedding_manager = Arc::new(RwLock::new(embedding_manager));
 
         let canvas = add_canvas(&db, create_dummy_embedding_canvas())
             .await
             .unwrap();
-        let canvas_id = canvas.id.unwrap();
+        let _canvas_id = canvas.id.unwrap();
 
-        let node = create_dummy_chat_node();
+        let _node = create_dummy_chat_node();
 
         // We need an EmbeddingService trait object.
         // Simulating the flow manually or skipping since we don't have the service defined here.
