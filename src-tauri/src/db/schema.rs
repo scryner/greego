@@ -40,6 +40,12 @@ pub struct ChatNodeData {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ChunkSource {
+    Question,
+    Answer,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Chunk {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<Thing>,
@@ -48,6 +54,7 @@ pub struct Chunk {
     pub node: Thing,
     pub canvas: Thing,
     pub created_at: DateTime<Utc>,
+    pub source: ChunkSource,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

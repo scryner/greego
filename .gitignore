@@ -26,3 +26,12 @@ dist-ssr
 # SurrealDB
 *.db
 *.db/*
+
+# Agent
+.agent
+.agent/*
+AGENTS.md
+
+# Ticket
+.tickets
+.tickets/*

@@ -1,7 +1,8 @@
 use crate::db::schema::{Canvas, Node};
 use crate::db::Database;
 // use crate::llm::LlmService; // Removed
-use crate::llm::LlmServiceManager; // Added
+use crate::embedding::EmbeddingServiceManager; // Added
+use crate::llm::LlmServiceManager;
 use log::error;
 use std::sync::Arc;
 use tauri::State;
@@ -354,21 +355,108 @@ pub async fn invoke_chat_command(
 #[tauri::command]
 pub async fn unified_query_command(
     app_handle: tauri::AppHandle,
+    state: State<'_, Database>,
     llm_service: State<'_, Arc<RwLock<LlmServiceManager>>>,
+    embedding_service: State<'_, Arc<RwLock<EmbeddingServiceManager>>>,
     prompt: String,
     model_id: String,
+    canvas_id: Option<String>,
 ) -> Result<(), String> {
     use log::info;
     info!(
-        "unified_query_command invoked: prompt='{}', model_id='{}'",
-        prompt, model_id
+        "unified_query_command invoked: prompt='{}', model_id='{}', canvas_id='{:?}'",
+        prompt, model_id, canvas_id
     );
     use crate::llm::{LlmInput, Message, Role};
     use futures::StreamExt;
     use tauri::Emitter;
 
+    // 1. Context Retrieval (RAG)
+    let mut context_str = String::new();
+
+    if let Some(cid_str) = canvas_id {
+        if let Some((tb, id)) = cid_str.split_once(':') {
+            let canvas_thing = surrealdb::sql::Thing::from((tb.to_string(), id.to_string()));
+
+            // Check if canvas has embedding enabled
+            use crate::db::operation;
+            match operation::fetch_canvas(&state.client, &canvas_thing).await {
+                Ok(canvas) => {
+                    if let Some(embedding_id) = canvas.embedding_id {
+                        if !embedding_id.is_empty() {
+                            info!(
+                                "Canvas has embedding_id: {}. Attempting RAG...",
+                                embedding_id
+                            );
+
+                            // Embed query
+                            let embedding_manager = embedding_service.inner().clone();
+                            let manager_guard = embedding_manager.read().await;
+
+                            match manager_guard
+                                .embed("local", "default", vec![prompt.clone()])
+                                .await
+                            {
+                                Ok(embeddings) => {
+                                    if let Some(query_embedding) = embeddings.first() {
+                                        // Search chunks
+                                        match operation::search_chunks(
+                                            &state.client,
+                                            canvas_thing,
+                                            query_embedding.clone(),
+                                            5,
+                                            0.4, // Threshold
+                                        )
+                                        .await
+                                        {
+                                            Ok(chunks) => {
+                                                if !chunks.is_empty() {
+                                                    info!("Found {} relevant chunks", chunks.len());
+                                                    context_str.push_str("Use the following context to answer the user request:\n\n");
+                                                    for (i, chunk) in chunks.iter().enumerate() {
+                                                        let prefix = match chunk.source {
+                                                            crate::db::schema::ChunkSource::Question => "User: ",
+                                                            crate::db::schema::ChunkSource::Answer => "Assistant: ",
+                                                        };
+                                                        context_str.push_str(&format!(
+                                                            "Context {}:\n{}{}\n\n",
+                                                            i + 1,
+                                                            prefix,
+                                                            chunk.content
+                                                        ));
+                                                    }
+                                                } else {
+                                                    info!("No relevant chunks found.");
+                                                }
+                                            }
+                                            Err(e) => {
+                                                error!("Failed to search chunks: {}", e);
+                                            }
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    error!("Failed to embed query: {}", e);
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to fetch canvas for RAG: {}", e);
+                }
+            }
+        }
+    }
+
+    let mut system_prompt = "You are a helpful assistant.".to_string();
+    if !context_str.is_empty() {
+        system_prompt.push_str("\n\n");
+        system_prompt.push_str(&context_str);
+    }
+
     let input = LlmInput {
-        system_prompt: Some("You are a helpful assistant.".to_string()),
+        system_prompt: Some(system_prompt),
         history: vec![],
         user_input: Message::new_text(Role::User, prompt),
     };

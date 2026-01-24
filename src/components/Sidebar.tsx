@@ -124,7 +124,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings, title = "Subje
 
                 try {
                     console.log("Unified Query: Calling GraphAPI.unifiedQuery...");
-                    await GraphAPI.unifiedQuery(userQuery, currentModel);
+                    await GraphAPI.unifiedQuery(userQuery, currentModel, canvasId);
                     console.log("Unified Query: GraphAPI.unifiedQuery returned successfully.");
                 } catch (e) {
                     console.error("Unified Query Invoke Error:", e);
